@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>博客管理后台</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body{font-family:system-ui,sans-serif}</style>
+</head>
+<body class="bg-zinc-50 text-zinc-900">
+
+<header class="border-b bg-white px-6 py-4 flex items-center justify-between">
+  <h1 class="text-lg font-semibold">博客管理后台</h1>
+  <nav class="flex gap-2">
+    <button onclick="showTab('site')" id="tab-site" class="px-4 py-1.5 rounded-md text-sm font-medium">站点配置</button>
+    <button onclick="showTab('posts')" id="tab-posts" class="px-4 py-1.5 rounded-md text-sm font-medium">文章管理</button>
+  </nav>
+</header>
+
+<main class="max-w-4xl mx-auto p-6">
+
+  <!-- 站点配置 -->
+  <section id="page-site" class="space-y-4">
+    <h2 class="text-xl font-semibold">站点信息</h2>
+    <div id="site-form" class="grid gap-3 max-w-xl"></div>
+    <button onclick="saveSite()" class="mt-4 px-4 py-2 bg-zinc-900 text-white rounded-md text-sm">保存站点配置</button>
+
+    <h2 class="text-xl font-semibold pt-8">开源项目</h2>
+    <div id="projects-list" class="space-y-3"></div>
+    <button onclick="addProject()" class="mt-2 px-3 py-1.5 border rounded-md text-sm">+ 添加项目</button>
+    <button onclick="saveProjects()" class="mt-2 px-4 py-2 bg-zinc-900 text-white rounded-md text-sm">保存项目列表</button>
+  </section>
+
+  <!-- 文章列表 -->
+  <section id="page-posts" class="hidden">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-semibold">文章列表</h2>
+      <button onclick="newPost()" class="px-4 py-2 bg-zinc-900 text-white rounded-md text-sm">+ 新建文章</button>
+    </div>
+    <div id="posts-list" class="space-y-2"></div>
+  </section>
+
+  <!-- 文章编辑器 -->
+  <section id="page-editor" class="hidden">
+    <button onclick="showTab('posts')" class="text-sm text-zinc-500 hover:text-zinc-900 mb-4">← 返回列表</button>
+    <div class="grid gap-3 max-w-2xl">
+      <label class="text-sm">标题 <input id="ed-title" class="mt-1 w-full border rounded-md px-3 py-2 text-sm"></label>
+      <label class="text-sm">Slug（英文 URL） <input id="ed-slug" class="mt-1 w-full border rounded-md px-3 py-2 text-sm font-mono"></label>
+      <label class="text-sm">摘要 <textarea id="ed-summary" rows="2" class="mt-1 w-full border rounded-md px-3 py-2 text-sm"></textarea></label>
+      <div class="grid grid-cols-2 gap-3">
+        <label class="text-sm">日期 <input id="ed-date" type="date" class="mt-1 w-full border rounded-md px-3 py-2 text-sm"></label>
+        <label class="text-sm">目录 <input id="ed-dir" class="mt-1 w-full border rounded-md px-3 py-2 text-sm font-mono" placeholder="frontend/react"></label>
+      </div>
+      <label class="text-sm">标签（逗号分隔） <input id="ed-tags" class="mt-1 w-full border rounded-md px-3 py-2 text-sm" placeholder="React, Next.js"></label>
+      <label class="text-sm">正文（Markdown） <textarea id="ed-content" rows="16" class="mt-1 w-full border rounded-md px-3 py-2 text-sm font-mono" spellcheck="false"></textarea></label>
+    </div>
+    <div class="flex gap-2 mt-4">
+      <button onclick="savePost()" class="px-4 py-2 bg-zinc-900 text-white rounded-md text-sm">保存</button>
+      <button onclick="deletePost()" class="px-4 py-2 border border-red-300 text-red-600 rounded-md text-sm">删除</button>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast" class="fixed bottom-6 right-6 px-4 py-2 bg-zinc-900 text-white rounded-md text-sm hidden"></div>
+
+<script>
+let currentPost = null
+let projects = []
+
+function toast(msg) {
+  const t = document.getElementById('toast')
+  t.textContent = msg
+  t.classList.remove('hidden')
+  setTimeout(() => t.classList.add('hidden'), 2000)
+}
+
+function showTab(name) {
+  document.getElementById('page-site').classList.add('hidden')
+  document.getElementById('page-posts').classList.add('hidden')
+  document.getElementById('page-editor').classList.add('hidden')
+  document.getElementById('tab-site').className = 'px-4 py-1.5 rounded-md text-sm font-medium'
+  document.getElementById('tab-posts').className = 'px-4 py-1.5 rounded-md text-sm font-medium'
+  if (name === 'site') { document.getElementById('page-site').classList.remove('hidden'); document.getElementById('tab-site').classList.add('bg-zinc-900','text-white') }
+  if (name === 'posts') { document.getElementById('page-posts').classList.remove('hidden'); document.getElementById('tab-posts').classList.add('bg-zinc-900','text-white'); loadPosts() }
+  if (name === 'editor') document.getElementById('page-editor').classList.remove('hidden')
+}
+
+// --- Site ---
+async function loadSite() {
+  const r = await fetch('/api/site')
+  const site = await r.json()
+  const form = document.getElementById('site-form')
+  form.innerHTML = ''
+  for (const [key, val] of Object.entries(site)) {
+    form.innerHTML += `<label class="text-sm">${key} <input id="site-${key}" value="${val ?? ''}" class="mt-1 w-full border rounded-md px-3 py-2 text-sm"></label>`
+  }
+}
+
+async function saveSite() {
+  const form = document.getElementById('site-form')
+  const site = {}
+  form.querySelectorAll('input').forEach(inp => { site[inp.id.replace('site-','')] = inp.value })
+  await fetch('/api/site', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(site) })
+  toast('站点配置已保存')
+}
+
+// --- Projects ---
+async function loadProjects() {
+  const r = await fetch('/api/projects')
+  projects = await r.json()
+  renderProjects()
+}
+
+function renderProjects() {
+  const el = document.getElementById('projects-list')
+  el.innerHTML = ''
+  projects.forEach((p, i) => {
+    el.innerHTML += `<div class="border rounded-md p-3 grid gap-2 max-w-xl">
+      <div class="flex gap-2"><input id="p-name-${i}" value="${p.name}" class="border rounded px-2 py-1 text-sm w-40"><input id="p-meta-${i}" value="${p.meta}" class="border rounded px-2 py-1 text-sm flex-1"></div>
+      <input id="p-desc-${i}" value="${p.description}" class="border rounded px-2 py-1 text-sm">
+      <input id="p-href-${i}" value="${p.href}" class="border rounded px-2 py-1 text-sm font-mono text-xs">
+    </div>`
+  })
+}
+
+function addProject() {
+  projects.push({ name:'', description:'', href:'', meta:'' })
+  renderProjects()
+}
+
+async function saveProjects() {
+  projects = projects.map((p, i) => ({
+    name: document.getElementById(`p-name-${i}`).value,
+    description: document.getElementById(`p-desc-${i}`).value,
+    href: document.getElementById(`p-href-${i}`).value,
+    meta: document.getElementById(`p-meta-${i}`).value,
+  }))
+  await fetch('/api/projects', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(projects) })
+  toast('项目列表已保存')
+}
+
+// --- Posts ---
+async function loadPosts() {
+  const r = await fetch('/api/posts')
+  const posts = await r.json()
+  const el = document.getElementById('posts-list')
+  el.innerHTML = ''
+  posts.forEach(p => {
+    el.innerHTML += `<div class="border rounded-md p-3 flex items-center justify-between bg-white">
+      <div><span class="font-medium">${p.title}</span> <span class="text-xs text-zinc-500 ml-2">${p.date} · ${p.dir}</span></div>
+      <button onclick="editPost('${p.slug}')" class="text-sm text-blue-600">编辑</button>
+    </div>`
+  })
+}
+
+async function editPost(slug) {
+  const r = await fetch(`/api/posts/${slug}`)
+  const post = await r.json()
+  currentPost = slug
+  document.getElementById('ed-title').value = post.title ?? ''
+  document.getElementById('ed-slug').value = post.slug ?? ''
+  document.getElementById('ed-summary').value = post.summary ?? ''
+  document.getElementById('ed-date').value = post.date ?? ''
+  document.getElementById('ed-dir').value = post.dir ?? ''
+  document.getElementById('ed-tags').value = (post.tags ?? []).join(', ')
+  document.getElementById('ed-content').value = post.content ?? ''
+  showTab('editor')
+}
+
+function newPost() {
+  currentPost = null
+  document.getElementById('ed-title').value = ''
+  document.getElementById('ed-slug').value = ''
+  document.getElementById('ed-summary').value = ''
+  document.getElementById('ed-date').value = new Date().toISOString().slice(0,10)
+  document.getElementById('ed-dir').value = 'notes'
+  document.getElementById('ed-tags').value = ''
+  document.getElementById('ed-content').value = ''
+  showTab('editor')
+}
+
+async function savePost() {
+  const body = {
+    title: document.getElementById('ed-title').value,
+    slug: document.getElementById('ed-slug').value,
+    summary: document.getElementById('ed-summary').value,
+    date: document.getElementById('ed-date').value,
+    dir: document.getElementById('ed-dir').value,
+    tags: document.getElementById('ed-tags').value.split(',').map(t=>t.trim()).filter(Boolean),
+    content: document.getElementById('ed-content').value,
+  }
+  const url = currentPost ? `/api/posts/${currentPost}` : '/api/posts'
+  const method = currentPost ? 'PUT' : 'POST'
+  const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+  if (!r.ok) { const e = await r.json(); toast('错误: ' + (e.error || r.status)); return }
+  toast('已保存')
+  currentPost = body.slug
+  loadPosts()
+}
+
+async function deletePost() {
+  if (!currentPost) return
+  if (!confirm('确认删除这篇文章？')) return
+  await fetch(`/api/posts/${currentPost}`, { method:'DELETE' })
+  toast('已删除')
+  showTab('posts')
+}
+
+// init
+loadSite()
+loadProjects()
+showTab('site')
+</script>
+</body>
+</html>
