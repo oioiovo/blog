@@ -80,7 +80,7 @@ export default function AboutPage() {
       </section>
 
       <section>
-        <SectionHeading command="ping linzhou" title="联系我" />
+        <SectionHeading command="ping oioiovo" title="联系我" />
         <p className="text-base leading-relaxed text-muted-foreground text-pretty">
           {'欢迎来信讨论技术问题、合作机会，或者只是打个招呼。我通常会在一周内回复。'}
         </p>
