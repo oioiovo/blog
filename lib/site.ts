@@ -1,9 +1,9 @@
 export const site = {
-  name: '林舟',
+  name: '谌',
   handle: 'linzhou',
-  title: '林舟 · 开发笔记',
+  title: '谌 · 开发笔记',
   description: '一名全栈开发者的技术博客，记录 Web 开发、数据库、Rust 与工程实践中的思考。',
-  email: 'hi@linzhou.dev',
+  email: 'shirley.chen0x0@icloud.com',
   url: 'https://oioiovo.github.io/blog',
   github: 'https://github.com/oioiovo',
   twitter: 'https://x.com/linzhou',
