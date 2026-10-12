@@ -4,7 +4,8 @@ export const site = {
   title: '林舟 · 开发笔记',
   description: '一名全栈开发者的技术博客，记录 Web 开发、数据库、Rust 与工程实践中的思考。',
   email: 'hi@linzhou.dev',
-  github: 'https://github.com/linzhou',
+  url: 'https://oioiovo.github.io/blog',
+  github: 'https://github.com/oioiovo',
   twitter: 'https://x.com/linzhou',
 }
 

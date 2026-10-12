@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { PostBody } from '@/components/post-body'
 import { PostPager } from '@/components/post-pager'
-import { PostToc } from '@/components/post-toc'
+import { PostTocAside, PostTocInline } from '@/components/post-toc'
 import { PostTree } from '@/components/post-tree'
 import {
   buildPostTree,
@@ -40,11 +40,11 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
   const tree = buildPostTree(getAllPosts())
 
   return (
-    <div className="grid gap-8 xl:grid-cols-[280px_minmax(0,760px)] xl:items-start xl:gap-12">
-      <aside aria-label="文章目录" className="order-2 min-w-0 xl:order-1 xl:sticky xl:top-24">
+    <div className="grid gap-8 xl:grid-cols-[280px_minmax(0,1fr)_200px] xl:items-start xl:gap-12">
+      <aside aria-label="文章目录树" className="order-2 min-w-0 xl:order-1 xl:sticky xl:top-24">
         <PostTree root={tree} />
       </aside>
-      <article className="order-1 min-w-0 max-w-[760px] xl:order-2">
+      <article className="order-1 min-w-0 xl:order-2">
       <header className="flex flex-col gap-5">
         <Link
           href="/posts"
@@ -64,7 +64,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
           {post.tags.map((tag) => (
             <li key={tag}>
               <Link
-                href={`/posts?tag=${encodeURIComponent(tag)}`}
+                href="/posts"
                 className="rounded-md border border-border bg-card px-2.5 py-1 text-muted-foreground hover:border-primary hover:text-primary"
               >
                 {`#${tag}`}
@@ -74,13 +74,16 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
         </ul>
       </header>
 
-      <div className="relative flex flex-col gap-10">
-        <PostToc items={toc.map(({ id, text }) => ({ id, text }))} />
+      <div className="mt-8 flex flex-col gap-10">
+        <PostTocInline items={toc.map(({ id, text }) => ({ id, text }))} />
         <PostBody blocks={post.body} />
       </div>
 
       <PostPager newer={newer} older={older} />
       </article>
+      <aside aria-label="文章目录" className="order-3 min-w-0 xl:order-3">
+        <PostTocAside items={toc.map(({ id, text }) => ({ id, text }))} />
+      </aside>
     </div>
   )
 }

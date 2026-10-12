@@ -59,7 +59,7 @@ export default function RootLayout({
     <html lang="zh-CN" className={`${geist.variable} ${jetbrains.variable} bg-background`}>
       <body className="flex min-h-dvh flex-col antialiased">
         <SiteHeader />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-12 md:px-8 md:py-16">{children}</main>
+        <main className="mx-auto w-full max-w-7xl flex-1 px-5 py-12 md:px-8 md:py-16">{children}</main>
         <SiteFooter />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
