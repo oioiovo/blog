@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { getReadingMinutes, getShortHash, type Post } from '@/lib/posts'
+import { getReadingMinutes, getShortHash } from '@/lib/posts-utils'
+import type { Post } from '@/lib/posts'
 
 export function CommitLog({ posts, showHead = true }: { posts: Post[]; showHead?: boolean }) {
   if (posts.length === 0) {
@@ -44,7 +45,7 @@ export function CommitLog({ posts, showHead = true }: { posts: Post[]; showHead?
                 <time dateTime={post.date} className="text-muted-foreground">
                   {post.date}
                 </time>
-                <span className="text-muted-foreground">{`${getReadingMinutes(post)} 分钟`}</span>
+                <span className="text-muted-foreground">{`${getReadingMinutes(post.content)} 分钟`}</span>
               </div>
               <h3 className="mt-2 text-lg font-semibold leading-snug text-balance transition-colors group-hover:text-primary">
                 {post.title}

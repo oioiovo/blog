@@ -8,6 +8,7 @@ import { PostTocAside, PostTocInline } from '@/components/post-toc'
 import { PostTree } from '@/components/post-tree'
 import {
   buildPostTree,
+  extractToc,
   getAdjacentPosts,
   getAllPosts,
   getPostBySlug,
@@ -36,7 +37,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
   if (!post) notFound()
 
   const { newer, older } = getAdjacentPosts(slug)
-  const toc = post.body.flatMap((block) => (block.type === 'h2' ? [block] : []))
+  const toc = extractToc(post.content)
   const tree = buildPostTree(getAllPosts())
 
   return (
@@ -56,7 +57,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-muted-foreground">
           <span className="text-primary">{`commit ${getShortHash(post.slug)}`}</span>
           <time dateTime={post.date}>{post.date}</time>
-          <span>{`约 ${getReadingMinutes(post)} 分钟阅读`}</span>
+          <span>{`约 ${getReadingMinutes(post.content)} 分钟阅读`}</span>
         </div>
         <h1 className="text-3xl font-semibold leading-tight tracking-tight text-balance md:text-4xl">{post.title}</h1>
         <p className="text-lg leading-relaxed text-muted-foreground text-pretty">{post.summary}</p>
@@ -75,14 +76,14 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
       </header>
 
       <div className="mt-8 flex flex-col gap-10">
-        <PostTocInline items={toc.map(({ id, text }) => ({ id, text }))} />
-        <PostBody blocks={post.body} />
+        <PostTocInline items={toc} />
+        <PostBody content={post.content} />
       </div>
 
       <PostPager newer={newer} older={older} />
       </article>
       <aside aria-label="文章目录" className="order-3 min-w-0 xl:order-3">
-        <PostTocAside items={toc.map(({ id, text }) => ({ id, text }))} />
+        <PostTocAside items={toc} />
       </aside>
     </div>
   )
