@@ -2,6 +2,8 @@ export const site = {
   name: '谌',
   handle: 'oioiovo',
   title: '谌 · 开发笔记',
+  tagline: '写代码，也写下写代码时的思考。',
+  bio: '全栈开发者，目前在一家 SaaS 公司做基础架构。关注 Web 性能、数据库和开发者工具，业余时间用 Rust 写一些小东西。这里是我的技术笔记本。',
   description: '一名全栈开发者的技术博客，记录 Web 开发、数据库、Rust 与工程实践中的思考。',
   email: 'shirley.chen0x0@icloud.com',
   url: 'https://oioiovo.github.io/blog',

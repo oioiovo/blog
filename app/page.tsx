@@ -20,12 +20,10 @@ export default function HomePage() {
           {site.name}
           {'。'}
           <br />
-          <span className="text-muted-foreground">{'写代码，也写下写代码时的思考。'}</span>
+          <span className="text-muted-foreground">{site.tagline}</span>
         </h1>
         <p className="max-w-xl text-base leading-relaxed text-muted-foreground text-pretty">
-          {
-            '全栈开发者，目前在一家 SaaS 公司做基础架构。关注 Web 性能、数据库和开发者工具，业余时间用 Rust 写一些小东西。这里是我的技术笔记本。'
-          }
+          {site.bio}
         </p>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
           <Link href="/posts" className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline">
