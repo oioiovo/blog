@@ -1,4 +1,5 @@
 import ReactMarkdown from 'react-markdown'
+import { Mermaid } from './mermaid'
 
 export function PostBody({ content }: { content: string }) {
   return (
@@ -34,10 +35,15 @@ export function PostBody({ content }: { content: string }) {
             </blockquote>
           ),
           pre: ({ children }) => {
-            // Extract lang from code block
             const codeEl = children as React.ReactElement<{ className?: string; children?: React.ReactNode }>
             const className = codeEl?.props?.className ?? ''
             const lang = className.replace('language-', '')
+            const code = String(codeEl?.props?.children ?? '')
+
+            if (lang === 'mermaid') {
+              return <Mermaid chart={code} />
+            }
+
             return (
               <figure className="overflow-hidden rounded-lg border border-border bg-card">
                 <figcaption className="border-b border-border bg-secondary px-4 py-1.5 font-mono text-xs text-muted-foreground">
