@@ -47,12 +47,14 @@ function findAllMdFiles(dir: string): string[] {
 function parsePost(filepath: string): Post {
   const raw = fs.readFileSync(filepath, 'utf8')
   const { data, content } = matter(raw)
-  const slug = path.basename(filepath).replace(/\.md$/, '')
+  // slug: use frontmatter slug if set, otherwise derive from filename (ASCII fallback)
+  const fileSlug = path.basename(filepath).replace(/\.md$/, '')
+  const slug = data.slug || fileSlug.toLowerCase().replace(/\s+/g, '-')
   // dir is the relative path from POSTS_DIR, without filename
   const rel = path.relative(POSTS_DIR, path.dirname(filepath)).replace(/\\/g, '/')
   return {
     slug,
-    title: data.title ?? slug,
+    title: data.title ?? fileSlug,
     summary: data.summary ?? '',
     date: data.date ? new Date(data.date).toISOString().slice(0, 10) : '',
     tags: data.tags ?? [],

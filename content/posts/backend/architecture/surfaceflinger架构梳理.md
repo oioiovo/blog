@@ -1,5 +1,6 @@
 ---
 title: surfaceflinger架构梳理
+slug: surfaceflinger-architecture
 summary: 
 date: 2026-10-13
 tags: []
