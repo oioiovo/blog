@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown'
 import { Mermaid } from './mermaid'
+import { getShortHash } from '@/lib/posts-utils'
 
 export function PostBody({ content }: { content: string }) {
   return (
@@ -8,9 +9,10 @@ export function PostBody({ content }: { content: string }) {
         components={{
           h2: ({ children }) => {
             const text = String(children)
+            const id = getShortHash(text)
             return (
-              <h2 className="group mt-6 scroll-mt-20 text-xl font-semibold tracking-tight">
-                <a href={`#${text}`} className="flex items-baseline gap-2">
+              <h2 id={id} className="group mt-6 scroll-mt-20 text-xl font-semibold tracking-tight">
+                <a href={`#${id}`} className="flex items-baseline gap-2">
                   <span aria-hidden="true" className="font-mono text-sm text-primary/60 group-hover:text-primary">
                     {'##'}
                   </span>
