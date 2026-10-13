@@ -1,4 +1,5 @@
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Mermaid } from './mermaid'
 import { getShortHash } from '@/lib/posts-utils'
 
@@ -6,6 +7,7 @@ export function PostBody({ content }: { content: string }) {
   return (
     <div className="flex flex-col gap-5 text-base leading-loose">
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         components={{
           h2: ({ children }) => {
             const text = String(children)
@@ -36,6 +38,14 @@ export function PostBody({ content }: { content: string }) {
               {children}
             </blockquote>
           ),
+          table: ({ children }) => (
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="w-full text-sm">{children}</table>
+            </div>
+          ),
+          thead: ({ children }) => <thead className="bg-secondary">{children}</thead>,
+          th: ({ children }) => <th className="px-4 py-2 text-left font-medium">{children}</th>,
+          td: ({ children }) => <td className="border-t px-4 py-2">{children}</td>,
           pre: ({ children }) => {
             const codeEl = children as React.ReactElement<{ className?: string; children?: React.ReactNode }>
             const className = codeEl?.props?.className ?? ''
