@@ -24,11 +24,17 @@ export function PostBody({ content }: { content: string }) {
             )
           },
           p: ({ children }) => <p className="text-pretty">{children}</p>,
+          a: ({ children, href }) => (
+            <a href={href} className="text-primary underline underline-offset-2 hover:opacity-80">{children}</a>
+          ),
+          inlineCode: ({ children }) => (
+            <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[0.85em]">{children}</code>
+          ),
           ul: ({ children }) => <ul className="flex flex-col gap-2">{children}</ul>,
           li: ({ children }) => (
-            <li className="flex gap-3">
-              <span aria-hidden="true" className="font-mono text-primary">
-                {'-'}
+            <li className="flex gap-2">
+              <span aria-hidden="true" className="font-mono text-primary shrink-0">
+                {'•'}
               </span>
               <span className="text-pretty">{children}</span>
             </li>
