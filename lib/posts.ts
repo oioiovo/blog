@@ -30,25 +30,39 @@ export const DIR_LABELS: Record<string, string> = {
 
 const POSTS_DIR = path.join(process.cwd(), 'content', 'posts')
 
-function parsePost(filename: string): Post {
-  const filepath = path.join(POSTS_DIR, filename)
+function findAllMdFiles(dir: string): string[] {
+  if (!fs.existsSync(dir)) return []
+  let results: string[] = []
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      results = results.concat(findAllMdFiles(full))
+    } else if (entry.name.endsWith('.md')) {
+      results.push(full)
+    }
+  }
+  return results
+}
+
+function parsePost(filepath: string): Post {
   const raw = fs.readFileSync(filepath, 'utf8')
   const { data, content } = matter(raw)
-  const slug = filename.replace(/\.md$/, '')
+  const slug = path.basename(filepath).replace(/\.md$/, '')
+  // dir is the relative path from POSTS_DIR, without filename
+  const rel = path.relative(POSTS_DIR, path.dirname(filepath)).replace(/\\/g, '/')
   return {
     slug,
     title: data.title ?? slug,
     summary: data.summary ?? '',
     date: data.date ? new Date(data.date).toISOString().slice(0, 10) : '',
     tags: data.tags ?? [],
-    dir: data.dir ?? '',
+    dir: data.dir ?? (rel === '.' ? '' : rel),
     content: content.trim(),
   }
 }
 
 export function getAllPosts(): Post[] {
-  if (!fs.existsSync(POSTS_DIR)) return []
-  const files = fs.readdirSync(POSTS_DIR).filter((f) => f.endsWith('.md'))
+  const files = findAllMdFiles(POSTS_DIR)
   return files.map(parsePost).sort((a, b) => b.date.localeCompare(a.date))
 }
 

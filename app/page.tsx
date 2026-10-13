@@ -5,8 +5,24 @@ import { SectionHeading } from '@/components/section-heading'
 import { getAllPosts } from '@/lib/posts'
 import { projects, site } from '@/lib/site'
 
-export default function HomePage() {
+async function enrichProjects() {
+  return Promise.all(
+    projects.map(async (p) => {
+      const m = p.href?.match(/github\.com[\/:]([^\/]+)\/([^\/\s]+?)(?:\.git)?$/)
+      if (!m) return p
+      try {
+        const r = await fetch(`https://api.github.com/repos/${m[1]}/${m[2]}`, { next: { revalidate: 3600 } })
+        if (!r.ok) return p
+        const d = await r.json()
+        return { ...p, name: d.name || p.name, description: d.description || p.description, meta: `★ ${d.stargazers_count}` }
+      } catch { return p }
+    })
+  )
+}
+
+export default async function HomePage() {
   const posts = getAllPosts()
+  const enrichedProjects = await enrichProjects()
 
   return (
     <div className="flex flex-col gap-20">
@@ -55,7 +71,7 @@ export default function HomePage() {
           <SectionHeading command="ls ~/projects" title="开源项目" />
         </div>
         <ul className="flex flex-col divide-y divide-border border-y border-border">
-          {projects.map((project) => (
+          {enrichedProjects.map((project) => (
             <li key={project.name}>
               <a
                 href={project.href}
@@ -70,7 +86,9 @@ export default function HomePage() {
                   <span className="text-sm leading-relaxed text-muted-foreground text-pretty">
                     {project.description}
                   </span>
-                  <span className="font-mono text-xs text-muted-foreground">{project.meta}</span>
+                  {project.showStars !== false && project.meta && (
+                    <span className="font-mono text-xs text-muted-foreground">{project.meta}</span>
+                  )}
                 </div>
                 <ArrowUpRight
                   className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary"

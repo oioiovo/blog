@@ -16,11 +16,6 @@ export function SiteFooter() {
             </a>
           </li>
           <li>
-            <a href={site.twitter} target="_blank" rel="noreferrer" className="hover:text-primary">
-              X / Twitter
-            </a>
-          </li>
-          <li>
             <a href={`mailto:${site.email}`} className="hover:text-primary">
               Email
             </a>
