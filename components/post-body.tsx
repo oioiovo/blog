@@ -30,15 +30,8 @@ export function PostBody({ content }: { content: string }) {
           inlineCode: ({ children }) => (
             <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[0.85em]">{children}</code>
           ),
-          ul: ({ children }) => <ul className="flex flex-col gap-2">{children}</ul>,
-          li: ({ children }) => (
-            <li className="flex gap-2">
-              <span aria-hidden="true" className="font-mono text-primary shrink-0">
-                {'•'}
-              </span>
-              <span className="text-pretty">{children}</span>
-            </li>
-          ),
+          ul: ({ children }) => <ul className="list-disc pl-6 my-2 flex flex-col gap-1">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal pl-6 my-2 flex flex-col gap-1">{children}</ol>,
           blockquote: ({ children }) => (
             <blockquote className="my-2 border-l-2 border-accent py-1 pl-5 text-lg font-medium text-balance">
               {children}
