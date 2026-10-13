@@ -1,0 +1,23 @@
+{
+  "intro": [
+    "你好，我是谌。写代码，也写下写代码时的思考。",
+    "全栈开发者，目前在一家 SaaS 公司做基础架构。关注 Web 性能、数据库和开发者工具，业余时间用 Rust 写一些小东西。这里是我的技术笔记本。"
+  ],
+  "stack": [
+    {
+      "group": "语言",
+      "items": "TypeScript · Rust · Go · SQL"
+    },
+    {
+      "group": "基础设施",
+      "items": "Vercel · Docker · GitHub Actions"
+    }
+  ],
+  "experience": [
+    {
+      "period": " — 至今",
+      "role": "高级工程师 · 基础架构",
+      "org": "某 SaaS 公司"
+    }
+  ]
+}

@@ -1,9 +1,8 @@
 ---
-slug: building-a-rust-cli
 title: 用 Rust 写一个命令行工具的完整过程
 summary: 从 cargo new 到发布到 crates.io：参数解析、错误处理、彩色输出、跨平台打包，一个周末项目的完整记录。
 date: 2026-08-22
-tags: [Rust, 工具]
+tags: ["Rust","工具"]
 dir: tools/rust
 ---
 

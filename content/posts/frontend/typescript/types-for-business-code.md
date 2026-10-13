@@ -1,9 +1,8 @@
 ---
-slug: types-for-business-code
 title: TypeScript 类型体操之外：写给业务代码的类型设计
 summary: 复杂的条件类型很炫，但业务代码更需要的是：让非法状态无法被表示。聊聊判别联合、品牌类型和边界校验。
 date: 2026-07-30
-tags: [TypeScript]
+tags: ["TypeScript"]
 dir: frontend/typescript
 ---
 
