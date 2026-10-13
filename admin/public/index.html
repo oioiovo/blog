@@ -5,95 +5,482 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>博客管理后台</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<style>body{font-family:system-ui,sans-serif}</style>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root {
+    --bg: oklch(0.975 0.004 250);
+    --fg: oklch(0.24 0.03 260);
+    --card: oklch(0.99 0.002 250);
+    --primary: oklch(0.47 0.16 258);
+    --muted: oklch(0.94 0.008 250);
+    --muted-fg: oklch(0.5 0.02 258);
+    --border: oklch(0.9 0.01 250);
+    --accent: oklch(0.85 0.13 80);
+  }
+  body {
+    font-family: system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    background-image: radial-gradient(oklch(0.47 0.16 258 / 0.06) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .mono { font-family: ui-monospace, 'JetBrains Mono', Menlo, monospace; }
+  .tree-file { -webkit-user-drag: element; user-select: none; }
+  .tree-item { cursor: pointer; border-radius: 6px; }
+  .tree-item:hover { background: var(--muted); }
+  .tree-item.active { background: var(--accent); }
+  .tree-file:hover .file-actions { opacity: 1; }
+  .file-actions { opacity: 0; transition: opacity 0.15s; }
+  /* Markdown preview */
+  #preview-content { font-size: 14px; line-height: 1.7; color: var(--fg); }
+  #preview-content h1 { font-size: 1.5em; font-weight: 700; margin: 1em 0 .5em; }
+  #preview-content h2 { font-size: 1.25em; font-weight: 700; margin: 1.2em 0 .5em; border-bottom: 1px solid var(--border); padding-bottom: .3em; }
+  #preview-content h3 { font-size: 1.1em; font-weight: 600; margin: 1em 0 .4em; }
+  #preview-content p { margin: .5em 0; }
+  #preview-content ul, #preview-content ol { padding-left: 1.5em; margin: .5em 0; }
+  #preview-content ul { list-style: disc; }
+  #preview-content ol { list-style: decimal; }
+  #preview-content li { margin: .2em 0; }
+  #preview-content code { background: var(--muted); padding: .15em .35em; border-radius: 4px; font-family: ui-monospace, monospace; font-size: .9em; }
+  #preview-content pre { background: oklch(0.2 0.02 260); color: oklch(0.93 0.008 250); padding: 1em; border-radius: 8px; overflow-x: auto; margin: .8em 0; }
+  #preview-content pre code { background: none; padding: 0; color: inherit; }
+  #preview-content blockquote { border-left: 3px solid var(--border); padding-left: 1em; color: var(--muted-fg); margin: .8em 0; }
+  #preview-content a { color: var(--primary); }
+  #preview-content table { width: 100%; border-collapse: collapse; margin: .8em 0; font-size: .9em; }
+  #preview-content th { background: var(--muted); text-align: left; padding: .5em .75em; font-weight: 600; }
+  #preview-content td { border-top: 1px solid var(--border); padding: .5em .75em; }
+  #preview-content hr { border: none; border-top: 1px solid var(--border); margin: 1.5em 0; }
+  #preview-content strong { font-weight: 600; }
+  input, textarea { outline: none; }
+  input:focus, textarea:focus { border-color: var(--primary) !important; }
+  .ctx-item:hover { background: var(--muted); }
+  .ctx-item[data-action="delete"]:hover { background: oklch(0.95 0.02 27); }
+</style>
 </head>
-<body class="bg-zinc-50 text-zinc-900">
+<body class="h-screen flex flex-col">
 
-<header class="border-b bg-white px-6 py-4 flex items-center justify-between">
-  <h1 class="text-lg font-semibold">博客管理后台</h1>
-  <nav class="flex gap-2">
-    <button onclick="showTab('site')" id="tab-site" class="px-4 py-1.5 rounded-md text-sm font-medium">站点配置</button>
-    <button onclick="showTab('posts')" id="tab-posts" class="px-4 py-1.5 rounded-md text-sm font-medium">文章管理</button>
-  </nav>
+<header class="border-b px-5 py-3 flex items-center justify-between shrink-0" style="border-color: var(--border); background: var(--card)">
+  <div class="flex items-center gap-4">
+    <h1 class="text-sm font-semibold mono">~/blog-admin</h1>
+    <nav class="flex gap-1">
+      <button onclick="showTab('posts')" id="tab-posts" class="px-3 py-1.5 rounded-md text-sm font-medium mono">文章</button>
+      <button onclick="showTab('site')" id="tab-site" class="px-3 py-1.5 rounded-md text-sm font-medium mono">站点配置</button>
+    </nav>
+  </div>
+  <div class="flex items-center gap-3">
+    <span id="git-status" class="text-xs mono" style="color: var(--muted-fg)"></span>
+    <button onclick="publish()" id="btn-publish" class="px-4 py-1.5 text-white rounded-md text-sm mono" style="background: var(--primary)">发布</button>
+  </div>
 </header>
 
-<main class="max-w-4xl mx-auto p-6">
+<main class="flex-1 flex overflow-hidden">
 
-  <!-- 站点配置 -->
-  <section id="page-site" class="space-y-4">
-    <h2 class="text-xl font-semibold">站点信息</h2>
-    <div id="site-form" class="grid gap-3 max-w-xl"></div>
-    <button onclick="saveSite()" class="mt-4 px-4 py-2 bg-zinc-900 text-white rounded-md text-sm">保存站点配置</button>
-
-    <h2 class="text-xl font-semibold pt-8">开源项目</h2>
-    <div id="projects-list" class="space-y-3"></div>
-    <button onclick="addProject()" class="mt-2 px-3 py-1.5 border rounded-md text-sm">+ 添加项目</button>
-    <button onclick="saveProjects()" class="mt-2 px-4 py-2 bg-zinc-900 text-white rounded-md text-sm">保存项目列表</button>
-  </section>
-
-  <!-- 文章列表 -->
-  <section id="page-posts" class="hidden">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xl font-semibold">文章列表</h2>
-      <button onclick="newPost()" class="px-4 py-2 bg-zinc-900 text-white rounded-md text-sm">+ 新建文章</button>
+  <!-- Sidebar -->
+  <aside class="w-72 border-r flex flex-col shrink-0" style="border-color: var(--border); background: var(--card)">
+    <div class="flex items-center justify-between px-3 py-2 border-b" style="border-color: var(--border)">
+      <span class="text-xs mono" style="color: var(--muted-fg)">content/posts</span>
     </div>
-    <div id="posts-list" class="space-y-2"></div>
-  </section>
+    <div id="tree" class="flex-1 overflow-y-auto p-1 text-sm"
+         oncontextmenu="showCtx(event, 'dir', '')"
+         ondragover="event.preventDefault();this.classList.add('bg-blue-50')"
+         ondragleave="this.classList.remove('bg-blue-50')"
+         ondrop="handleDrop(event)"></div>
+  </aside>
 
-  <!-- 文章编辑器 -->
-  <section id="page-editor" class="hidden">
-    <button onclick="showTab('posts')" class="text-sm text-zinc-500 hover:text-zinc-900 mb-4">← 返回列表</button>
-    <div class="grid gap-3 max-w-2xl">
-      <label class="text-sm">标题 <input id="ed-title" class="mt-1 w-full border rounded-md px-3 py-2 text-sm"></label>
-      <label class="text-sm">Slug（英文 URL） <input id="ed-slug" class="mt-1 w-full border rounded-md px-3 py-2 text-sm font-mono"></label>
-      <label class="text-sm">摘要 <textarea id="ed-summary" rows="2" class="mt-1 w-full border rounded-md px-3 py-2 text-sm"></textarea></label>
-      <div class="grid grid-cols-2 gap-3">
-        <label class="text-sm">日期 <input id="ed-date" type="date" class="mt-1 w-full border rounded-md px-3 py-2 text-sm"></label>
-        <label class="text-sm">目录 <input id="ed-dir" class="mt-1 w-full border rounded-md px-3 py-2 text-sm font-mono" placeholder="frontend/react"></label>
+  <!-- Right pane -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+
+    <div id="page-posts" class="flex-1 flex flex-col overflow-hidden">
+      <div id="empty-state" class="flex-1 flex items-center justify-center text-sm mono" style="color: var(--muted-fg)">
+        <span style="color: var(--primary)">$</span> &nbsp;select a post to edit
       </div>
-      <label class="text-sm">标签（逗号分隔） <input id="ed-tags" class="mt-1 w-full border rounded-md px-3 py-2 text-sm" placeholder="React, Next.js"></label>
-      <label class="text-sm">正文（Markdown） <textarea id="ed-content" rows="16" class="mt-1 w-full border rounded-md px-3 py-2 text-sm font-mono" spellcheck="false"></textarea></label>
-    </div>
-    <div class="flex gap-2 mt-4">
-      <button onclick="savePost()" class="px-4 py-2 bg-zinc-900 text-white rounded-md text-sm">保存</button>
-      <button onclick="deletePost()" class="px-4 py-2 border border-red-300 text-red-600 rounded-md text-sm">删除</button>
-    </div>
-  </section>
 
+      <div id="editor" class="flex-1 flex-col overflow-hidden hidden">
+        <div class="flex items-center justify-between px-5 py-2 border-b shrink-0" style="border-color: var(--border); background: var(--card)">
+          <div class="flex items-center gap-3">
+            <span id="ed-stats" class="text-xs mono" style="color: var(--muted-fg)"></span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="flex border rounded-md overflow-hidden text-xs mono" style="border-color: var(--border)">
+              <button onclick="setMode('edit')" id="mode-edit" class="px-3 py-1.5">编辑</button>
+              <button onclick="setMode('split')" id="mode-split" class="px-3 py-1.5 border-l">分屏</button>
+              <button onclick="setMode('preview')" id="mode-preview" class="px-3 py-1.5 border-l">预览</button>
+            </div>
+            <button onclick="savePost()" class="px-3 py-1.5 text-white rounded-md text-sm mono" style="background: var(--primary)">保存</button>
+            <button onclick="deletePost()" class="px-3 py-1.5 border rounded-md text-sm mono" style="border-color: oklch(0.577 0.245 27); color: oklch(0.577 0.245 27)">删除</button>
+          </div>
+        </div>
+        <!-- Metadata always visible -->
+        <div class="px-5 py-3 border-b shrink-0" style="border-color: var(--border); background: var(--card)">
+          <input id="ed-title" placeholder="标题" class="text-lg font-semibold border-0 border-b px-1 py-1 bg-transparent w-full" style="border-color: var(--border)">
+          <div class="grid grid-cols-3 gap-2 mt-2">
+            <input id="ed-slug" placeholder="slug" class="border rounded px-2 py-1 text-xs mono" style="border-color: var(--border)">
+            <input id="ed-date" type="date" class="border rounded px-2 py-1 text-xs" style="border-color: var(--border)">
+            <input id="ed-tags" placeholder="标签，逗号分隔" class="border rounded px-2 py-1 text-xs" style="border-color: var(--border)">
+          </div>
+          <textarea id="ed-summary" placeholder="摘要" rows="1" class="mt-2 w-full border rounded px-2 py-1 text-xs" style="resize:none; border-color: var(--border)"></textarea>
+        </div>
+        <!-- Content area -->
+        <div class="flex-1 flex overflow-hidden" id="content-area">
+          <div id="edit-pane" class="flex-1 overflow-hidden flex flex-col">
+            <textarea id="ed-content" placeholder="// write markdown here" class="flex-1 border-0 outline-none px-5 py-3 mono text-sm resize-none" spellcheck="false" oninput="updatePreview()"></textarea>
+          </div>
+          <div id="preview-pane" class="flex-1 overflow-y-auto px-5 py-3 border-l" style="border-color: var(--border)">
+            <article id="preview-content"></article>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-site" class="flex-1 overflow-y-auto p-6 hidden">
+      <div class="max-w-xl space-y-4">
+        <h2 class="text-base font-semibold mono" style="color: var(--primary)">$ cat site.json</h2>
+        <div id="site-form" class="grid gap-3"></div>
+        <button onclick="saveSite()" class="px-4 py-2 text-white rounded-md text-sm mono" style="background: var(--primary)">保存</button>
+        <h2 class="text-base font-semibold mono pt-6" style="color: var(--primary)">$ ls ~/projects</h2>
+        <div id="projects-list" class="space-y-3"></div>
+        <div class="flex gap-2">
+          <button onclick="addProject()" class="px-3 py-1.5 border rounded-md text-sm mono" style="border-color: var(--border)">+ 添加项目</button>
+          <button onclick="saveProjects()" class="px-4 py-2 text-white rounded-md text-sm mono" style="background: var(--primary)">保存</button>
+        </div>
+
+        <h2 class="text-base font-semibold mono pt-8 border-t mt-8" style="color: var(--primary); border-color: var(--border)">$ cat about.md</h2>
+        <div class="grid gap-4">
+          <div>
+            <label class="text-xs font-medium text-zinc-500">自我介绍段落</label>
+            <div id="about-intro-list" class="mt-1 space-y-2"></div>
+            <button onclick="addIntroPara()" class="mt-1 text-xs px-2 py-1 border rounded mono" style="border-color: var(--border)">+ 添加段落</button>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-zinc-500">技术栈分组</label>
+            <div id="about-stack-list" class="mt-1 space-y-2"></div>
+            <button onclick="addStackGroup()" class="mt-1 text-xs px-2 py-1 border rounded mono" style="border-color: var(--border)">+ 添加分组</button>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-zinc-500">工作经历</label>
+            <div id="about-exp-list" class="mt-1 space-y-2"></div>
+            <button onclick="addExpItem()" class="mt-1 text-xs px-2 py-1 border rounded mono" style="border-color: var(--border)">+ 添加经历</button>
+          </div>
+          <button onclick="saveAbout()" class="px-4 py-2 text-white rounded-md text-sm mono w-fit" style="background: var(--primary)">保存关于页</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
 </main>
 
-<div id="toast" class="fixed bottom-6 right-6 px-4 py-2 bg-zinc-900 text-white rounded-md text-sm hidden"></div>
+<div id="toast" class="fixed bottom-6 right-6 px-4 py-2 text-white rounded-md text-sm mono hidden" style="background: var(--primary)"></div>
+
+<!-- Context menu -->
+<div id="ctx-menu" class="fixed hidden bg-white border rounded-md shadow-lg py-1 z-50 min-w-[140px] text-sm">
+  <div class="ctx-item px-3 py-1.5 cursor-pointer mono" data-action="new-post">新建文章</div>
+  <div class="ctx-item px-3 py-1.5 cursor-pointer mono" data-action="new-dir">新建目录</div>
+  <div class="ctx-item px-3 py-1.5 cursor-pointer mono" data-action="upload">上传文章</div>
+  <div class="border-t my-1"></div>
+  <div class="ctx-item px-3 py-1.5 cursor-pointer mono" data-action="rename">重命名</div>
+  <div class="ctx-item px-3 py-1.5 cursor-pointer mono" data-action="move">移动到...</div>
+  <div class="ctx-item px-3 py-1.5 hover:bg-red-50 cursor-pointer" style="color: oklch(0.577 0.245 27)" data-action="delete">删除</div>
+</div>
+
+<!-- Modal dialog -->
+<div id="modal-overlay" class="fixed inset-0 bg-black/30 hidden items-center justify-center z-50">
+  <div class="bg-white rounded-lg shadow-xl p-5 w-96">
+    <h3 id="modal-title" class="text-base font-semibold mb-3"></h3>
+    <input id="modal-input" class="w-full border rounded-md px-3 py-2 text-sm font-mono" spellcheck="false">
+    <div class="flex justify-end gap-2 mt-4">
+      <button onclick="closeModal()" class="px-3 py-1.5 border rounded-md text-sm">取消</button>
+      <button onclick="confirmModal()" class="px-3 py-1.5 text-white rounded-md text-sm mono" style="background: var(--primary)">确定</button>
+    </div>
+  </div>
+</div>
 
 <script>
-let currentPost = null
+let currentRef = null  // { dir, slug }
 let projects = []
+let expandedDirs = new Set()
+let modalIsConfirm = false
 
 function toast(msg) {
   const t = document.getElementById('toast')
   t.textContent = msg
   t.classList.remove('hidden')
-  setTimeout(() => t.classList.add('hidden'), 2000)
+  setTimeout(() => t.classList.add('hidden'), 2200)
 }
 
 function showTab(name) {
-  document.getElementById('page-site').classList.add('hidden')
-  document.getElementById('page-posts').classList.add('hidden')
-  document.getElementById('page-editor').classList.add('hidden')
-  document.getElementById('tab-site').className = 'px-4 py-1.5 rounded-md text-sm font-medium'
-  document.getElementById('tab-posts').className = 'px-4 py-1.5 rounded-md text-sm font-medium'
-  if (name === 'site') { document.getElementById('page-site').classList.remove('hidden'); document.getElementById('tab-site').classList.add('bg-zinc-900','text-white') }
-  if (name === 'posts') { document.getElementById('page-posts').classList.remove('hidden'); document.getElementById('tab-posts').classList.add('bg-zinc-900','text-white'); loadPosts() }
-  if (name === 'editor') document.getElementById('page-editor').classList.remove('hidden')
+  document.getElementById('page-posts').classList.toggle('hidden', name !== 'posts')
+  document.getElementById('page-site').classList.toggle('hidden', name !== 'site')
+  document.getElementById('tab-posts').className = 'px-3 py-1.5 rounded-md text-sm font-medium'
+  document.getElementById('tab-site').className = 'px-3 py-1.5 rounded-md text-sm font-medium'
+  if (name === 'posts') document.getElementById('tab-posts').style.background = 'var(--primary)', document.getElementById('tab-posts').style.color = 'white'
+  else document.getElementById('tab-site').style.background = 'var(--primary)', document.getElementById('tab-site').style.color = 'white'
 }
 
-// --- Site ---
+// === Tree ===
+let inlineState = null  // { type: 'new-post'|'new-dir', parentDir }
+
+async function loadTree() {
+  const r = await fetch('/api/tree')
+  const data = await r.json()
+  // auto-expand all dirs on first load
+  if (!loadTree._initialized) {
+    function collectDirs(node) {
+      for (const d of node.dirs) { expandedDirs.add(d.path); collectDirs(d) }
+    }
+    collectDirs(data)
+    loadTree._initialized = true
+  }
+  const el = document.getElementById('tree')
+  el.innerHTML = renderNode(data, 0)
+  if (inlineState) {
+    // expand parent dir
+    if (inlineState.parentDir) expandedDirs.add(inlineState.parentDir)
+    // re-render if we just expanded something
+    if (inlineState.parentDir && !el.querySelector(`[data-dir="${inlineState.parentDir}"]`)) {
+      el.innerHTML = renderNode(data, 0)
+    }
+    const container = inlineState.parentDir
+      ? el.querySelector(`[data-dir="${inlineState.parentDir}"]`) || el
+      : el
+    insertInlineRow(container, inlineState)
+  }
+}
+
+function insertInlineRow(container, state) {
+  const row = document.createElement('div')
+  row.className = 'flex items-center gap-1 px-1 py-1 rounded bg-blue-50'
+  row.style.paddingLeft = '24px'
+  row.innerHTML = `<span>${state.type === 'new-dir' ? '📁' : '📄'}</span>`
+  const inp = document.createElement('input')
+  inp.className = 'flex-1 border border-blue-400 rounded px-1 py-0.5 text-sm bg-white outline-none'
+  inp.placeholder = state.type === 'new-dir' ? '文件夹名' : '文件名.md'
+  row.appendChild(inp)
+  container.appendChild(row)
+  inp.focus()
+  inp.onkeydown = async (e) => {
+    if (e.key === 'Escape') { inlineState = null; loadTree() }
+    if (e.key === 'Enter') {
+      const name = inp.value.trim()
+      if (!name) { inlineState = null; loadTree(); return }
+      if (state.type === 'new-dir') {
+        const path = state.parentDir ? `${state.parentDir}/${name}` : name
+        await fetch('/api/dirs', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ path }) })
+        toast('目录已创建')
+      } else {
+        const dir = state.parentDir || 'notes'
+        const slug = name.replace(/\.md$/, '')
+        await fetch('/api/posts', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({
+          slug, title: slug.replace(/-/g, ' '), dir, date: new Date().toISOString().slice(0,10), tags: [], summary: '', content: ''
+        })})
+        editPost(dir, slug)
+      }
+      inlineState = null
+      loadTree()
+      refreshGitStatus()
+    }
+  }
+  inp.onblur = () => { inlineState = null; loadTree() }
+}
+
+function renderNode(node, depth) {
+  let html = ''
+  for (const dir of node.dirs) {
+    const expanded = expandedDirs.has(dir.path)
+    const pad = depth * 14
+    html += `
+      <div>
+        <div class="tree-item flex items-center gap-1 px-1 py-1 rounded" style="padding-left:${pad}px"
+             draggable="true"
+             ondragstart="dragDir(event,'${dir.path}')"
+             onclick="toggleDir('${dir.path}')"
+             oncontextmenu="showCtx(event, 'dir', '${dir.path}')"
+             ondragover="event.preventDefault();this.classList.add('bg-blue-100')"
+             ondragleave="this.classList.remove('bg-blue-100')"
+             ondrop="dropDir(event,'${dir.path}')">
+          <span class="text-xs text-zinc-400 w-3">${expanded ? '▾' : '▸'}</span>
+          <span>📁</span>
+          <span class="flex-1 truncate">${dir.name}</span>
+        </div>
+        <div class="dir-children" data-dir="${dir.path}">
+          ${expanded ? renderNode(dir, depth + 1) : ''}
+        </div>
+      </div>`
+  }
+  for (const f of node.files) {
+    const pad = depth * 14 + 22
+    const active = currentRef && currentRef.dir === f.dir && currentRef.slug === f.slug ? 'active' : ''
+    html += `
+      <div class="tree-item tree-file flex items-center gap-1 px-1 py-1 rounded ${active}" style="padding-left:${pad}px"
+           draggable="true"
+           ondragstart="dragPost(event,'${f.dir || ''}','${f.slug}')"
+           onclick="editPost('${f.dir || ''}', '${f.slug}')"
+           oncontextmenu="showCtx(event, 'file', '${f.dir || ''}', '${f.slug}')">
+        <span class="text-zinc-300 cursor-grab select-none" title="拖拽移动">⠿</span>
+        <span>📄</span>
+        <span class="flex-1 truncate">${f.slug}.md</span>
+      </div>`
+  }
+  return html
+}
+
+function toggleDir(p) {
+  if (expandedDirs.has(p)) expandedDirs.delete(p)
+  else expandedDirs.add(p)
+  loadTree()
+}
+
+// === Directory operations ===
+async function newDirPrompt(parentDir) {
+  const defaultValue = parentDir ? `${parentDir}/` : ''
+  const p = await ask('新建目录', defaultValue, '例如 frontend/vue')
+  if (!p) return
+  await fetch('/api/dirs', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ path: p }) })
+  expandedDirs.add(p.split('/').slice(0, -1).join('/'))
+  toast('目录已创建')
+  loadTree()
+}
+
+async function renameDirPrompt(oldPath) {
+  const newPath = await ask('重命名目录为', oldPath)
+  if (!newPath || newPath === oldPath) return
+  await fetch('/api/dirs', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ oldPath, newPath }) })
+  toast('目录已重命名')
+  loadTree()
+}
+
+async function deleteDirPrompt(p) {
+  if (!await confirmDlg(`删除目录 "${p}" 及其所有文章？`)) return
+  await fetch('/api/dirs', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ path: p }) })
+  toast('目录已删除')
+  loadTree()
+}
+
+// === Post operations ===
+let newPostDir = 'notes'
+
+async function newPostPrompt(dir) {
+  const d = await ask('在哪个目录创建？', dir || 'notes', '例如 frontend/react')
+  if (!d) return
+  newPostDir = d
+  currentRef = null
+  document.getElementById('ed-title').value = ''
+  document.getElementById('ed-slug').value = ''
+  document.getElementById('ed-summary').value = ''
+  document.getElementById('ed-date').value = new Date().toISOString().slice(0,10)
+  document.getElementById('ed-tags').value = ''
+  document.getElementById('ed-content').value = ''
+  showEditor()
+  setMode('edit')
+}
+
+async function editPost(dir, slug) {
+  const r = await fetch(`/api/posts/${dir}/${slug}`)
+  const post = await r.json()
+  currentRef = { dir, slug }
+  document.getElementById('ed-title').value = post.title ?? ''
+  document.getElementById('ed-slug').value = post.slug ?? ''
+  document.getElementById('ed-summary').value = post.summary ?? ''
+  document.getElementById('ed-date').value = post.date ?? ''
+  document.getElementById('ed-tags').value = (post.tags ?? []).join(', ')
+  document.getElementById('ed-content').value = post.content ?? ''
+  showEditor()
+  setMode('split')
+  updatePreview()
+  loadTree()
+}
+
+function showEditor() {
+  document.getElementById('empty-state').classList.add('hidden')
+  document.getElementById('editor').classList.remove('hidden')
+  document.getElementById('editor').classList.add('flex')
+}
+
+function setMode(mode) {
+  const editPane = document.getElementById('edit-pane')
+  const previewPane = document.getElementById('preview-pane')
+  const btns = {
+    edit: document.getElementById('mode-edit'),
+    split: document.getElementById('mode-split'),
+    preview: document.getElementById('mode-preview'),
+  }
+  for (const [k, btn] of Object.entries(btns)) {
+    btn.classList.toggle('text-white', k === mode)
+    if (k === mode) btn.style.background = 'var(--primary)'
+    else btn.style.background = ''
+  }
+  if (mode === 'edit') {
+    editPane.classList.remove('hidden')
+    editPane.classList.add('flex-1')
+    previewPane.classList.add('hidden')
+  } else if (mode === 'preview') {
+    editPane.classList.add('hidden')
+    previewPane.classList.remove('hidden')
+    previewPane.classList.add('flex-1')
+    updatePreview()
+  } else {
+    editPane.classList.remove('hidden')
+    editPane.classList.add('flex-1')
+    previewPane.classList.remove('hidden')
+    previewPane.classList.add('flex-1')
+    updatePreview()
+  }
+}
+
+function updatePreview() {
+  const md = document.getElementById('ed-content').value
+  document.getElementById('preview-content').innerHTML = marked.parse(md)
+  // stats
+  const chars = md.length
+  const words = md.split(/\s+/).filter(Boolean).length
+  const mins = Math.max(1, Math.round(words / 300))
+  document.getElementById('ed-stats').textContent = `${words} 字 · 约 ${mins} 分钟`
+}
+
+async function savePost() {
+  const body = {
+    title: document.getElementById('ed-title').value,
+    slug: document.getElementById('ed-slug').value,
+    summary: document.getElementById('ed-summary').value,
+    date: document.getElementById('ed-date').value,
+    dir: currentRef ? currentRef.dir : newPostDir,
+    tags: document.getElementById('ed-tags').value.split(',').map(t=>t.trim()).filter(Boolean),
+    content: document.getElementById('ed-content').value,
+  }
+  let r
+  if (currentRef) {
+    r = await fetch(`/api/posts/${currentRef.dir}/${currentRef.slug}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) })
+  } else {
+    r = await fetch('/api/posts', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) })
+  }
+  if (!r.ok) { const e = await r.json(); toast('错误: ' + (e.error || r.status)); return }
+  toast('已保存')
+  currentRef = { dir: body.dir, slug: body.slug }
+  expandedDirs.add(body.dir)
+  loadTree()
+  refreshGitStatus()
+}
+
+async function deletePost() {
+  if (!currentRef) return
+  if (!await confirmDlg('确认删除这篇文章？')) return
+  await fetch(`/api/posts/${currentRef.dir}/${currentRef.slug}`, { method: 'DELETE' })
+  toast('已删除')
+  currentRef = null
+  document.getElementById('editor').classList.add('hidden')
+  document.getElementById('editor').classList.remove('flex')
+  document.getElementById('empty-state').classList.remove('hidden')
+  loadTree()
+  refreshGitStatus()
+}
+
+// === Site ===
 async function loadSite() {
   const r = await fetch('/api/site')
   const site = await r.json()
   const form = document.getElementById('site-form')
   form.innerHTML = ''
   for (const [key, val] of Object.entries(site)) {
-    form.innerHTML += `<label class="text-sm">${key} <input id="site-${key}" value="${val ?? ''}" class="mt-1 w-full border rounded-md px-3 py-2 text-sm"></label>`
+    form.innerHTML += `<label class="text-xs mono" style="color: var(--muted-fg)">${key} <input id="site-${key}" value="${val ?? ''}" class="mt-1 w-full border rounded-md px-3 py-2 text-sm" style="border-color: var(--border)"></label>`
   }
 }
 
@@ -103,23 +490,106 @@ async function saveSite() {
   form.querySelectorAll('input').forEach(inp => { site[inp.id.replace('site-','')] = inp.value })
   await fetch('/api/site', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(site) })
   toast('站点配置已保存')
+  refreshGitStatus()
 }
 
-// --- Projects ---
 async function loadProjects() {
   const r = await fetch('/api/projects')
   projects = await r.json()
   renderProjects()
 }
 
+let aboutData = { intro: [], stack: [], experience: [] }
+
+function syncAboutFromDOM() {
+  aboutData.intro = Array.from(document.querySelectorAll('#about-intro-list textarea')).map(t => t.value)
+  aboutData.stack = Array.from(document.querySelectorAll('#about-stack-list > div')).map((_, i) => ({
+    group: document.getElementById(`sg-${i}`)?.value ?? '',
+    items: document.getElementById(`si-${i}`)?.value ?? '',
+  }))
+  aboutData.experience = Array.from(document.querySelectorAll('#about-exp-list > div')).map((_, i) => {
+    const start = document.getElementById(`es-${i}`)?.value ?? ''
+    const present = document.getElementById(`epresent-${i}`)?.checked ?? false
+    const end = present ? '至今' : (document.getElementById(`ee-${i}`)?.value || '')
+    return { period: `${start} — ${end}`, role: document.getElementById(`er-${i}`)?.value ?? '', org: document.getElementById(`eo-${i}`)?.value ?? '' }
+  })
+}
+
+async function loadAbout() {
+  const r = await fetch('/api/about')
+  aboutData = await r.json()
+  renderAbout()
+}
+
+function renderAbout() {
+  // intro
+  const il = document.getElementById('about-intro-list')
+  il.innerHTML = ''
+  aboutData.intro.forEach((p, i) => {
+    il.innerHTML += `<div class="flex gap-2"><textarea rows="2" id="ai-${i}" class="flex-1 border rounded px-2 py-1 text-sm" style="border-color: var(--border)">${p}</textarea><button onclick="syncAboutFromDOM();aboutData.intro.splice(${i},1);renderAbout()" class="px-1" style="color: oklch(0.577 0.245 27)">×</button></div>`
+  })
+  // stack
+  const sl = document.getElementById('about-stack-list')
+  sl.innerHTML = ''
+  aboutData.stack.forEach((s, i) => {
+    sl.innerHTML += `<div class="flex gap-2">
+      <input id="sg-${i}" value="${s.group}" placeholder="分组" class="border rounded px-2 py-1 text-sm w-32">
+      <input id="si-${i}" value="${s.items}" placeholder="内容" class="flex-1 border rounded px-2 py-1 text-sm">
+      <button onclick="syncAboutFromDOM();aboutData.stack.splice(${i},1);renderAbout()" class="px-1" style="color: oklch(0.577 0.245 27)">×</button>
+    </div>`
+  })
+  // experience
+  const el = document.getElementById('about-exp-list')
+  el.innerHTML = ''
+  aboutData.experience.forEach((e, i) => {
+    const [start, end] = (e.period || '').split(' — ')
+    const isPresent = !end || end === '至今'
+    el.innerHTML += `<div class="flex gap-2 items-center">
+      <input type="month" id="es-${i}" value="${start || ''}" class="border rounded px-2 py-1 text-sm">
+      <span class="text-zinc-400">—</span>
+      <input type="month" id="ee-${i}" value="${isPresent ? '' : end || ''}" ${isPresent ? 'disabled' : ''} class="border rounded px-2 py-1 text-sm">
+      <label class="flex items-center gap-1 text-xs text-zinc-500 whitespace-nowrap"><input type="checkbox" id="epresent-${i}" ${isPresent ? 'checked' : ''} onchange="document.getElementById('ee-${i}').disabled=this.checked">至今</label>
+      <input id="er-${i}" value="${e.role}" placeholder="职位" class="flex-1 border rounded px-2 py-1 text-sm">
+      <input id="eo-${i}" value="${e.org}" placeholder="公司" class="flex-1 border rounded px-2 py-1 text-sm">
+      <button onclick="syncAboutFromDOM();aboutData.experience.splice(${i},1);renderAbout()" class="px-1" style="color: oklch(0.577 0.245 27)">×</button>
+    </div>`
+  })
+}
+
+function addIntroPara() { syncAboutFromDOM(); aboutData.intro.push(''); renderAbout() }
+function addStackGroup() { syncAboutFromDOM(); aboutData.stack.push({ group: '', items: '' }); renderAbout() }
+function addExpItem() { syncAboutFromDOM(); aboutData.experience.push({ period: '', role: '', org: '' }); renderAbout() }
+
+async function saveAbout() {
+  // read from DOM
+  aboutData.intro = Array.from(document.querySelectorAll('#about-intro-list textarea')).map(t => t.value.trim()).filter(Boolean)
+  aboutData.stack = Array.from(document.querySelectorAll('#about-stack-list > div')).map((_, i) => ({
+    group: document.getElementById(`sg-${i}`).value,
+    items: document.getElementById(`si-${i}`).value,
+  }))
+  aboutData.experience = Array.from(document.querySelectorAll('#about-exp-list > div')).map((_, i) => {
+    const start = document.getElementById(`es-${i}`).value
+    const present = document.getElementById(`epresent-${i}`).checked
+    const end = present ? '至今' : (document.getElementById(`ee-${i}`).value || '')
+    return {
+      period: `${start} — ${end}`,
+      role: document.getElementById(`er-${i}`).value,
+      org: document.getElementById(`eo-${i}`).value,
+    }
+  })
+  await fetch('/api/about', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(aboutData) })
+  toast('关于页已保存')
+  refreshGitStatus()
+}
+
 function renderProjects() {
   const el = document.getElementById('projects-list')
   el.innerHTML = ''
   projects.forEach((p, i) => {
-    el.innerHTML += `<div class="border rounded-md p-3 grid gap-2 max-w-xl">
-      <div class="flex gap-2"><input id="p-name-${i}" value="${p.name}" class="border rounded px-2 py-1 text-sm w-40"><input id="p-meta-${i}" value="${p.meta}" class="border rounded px-2 py-1 text-sm flex-1"></div>
-      <input id="p-desc-${i}" value="${p.description}" class="border rounded px-2 py-1 text-sm">
-      <input id="p-href-${i}" value="${p.href}" class="border rounded px-2 py-1 text-sm font-mono text-xs">
+    el.innerHTML += `<div class="border rounded-md p-2 flex items-center gap-2">
+      <input id="p-href-${i}" value="${p.href}" placeholder="https://github.com/user/repo" class="flex-1 border rounded px-2 py-1 text-sm font-mono">
+      <label class="flex items-center gap-1 text-xs text-zinc-500 whitespace-nowrap"><input type="checkbox" id="p-stars-${i}" ${p.showStars !== false ? 'checked' : ''}> 显示Star</label>
+      <button onclick="removeProject(${i})" class="px-2 text-sm whitespace-nowrap" style="color: oklch(0.577 0.245 27)">删除</button>
     </div>`
   })
 }
@@ -129,88 +599,336 @@ function addProject() {
   renderProjects()
 }
 
-async function saveProjects() {
-  projects = projects.map((p, i) => ({
-    name: document.getElementById(`p-name-${i}`).value,
-    description: document.getElementById(`p-desc-${i}`).value,
-    href: document.getElementById(`p-href-${i}`).value,
-    meta: document.getElementById(`p-meta-${i}`).value,
-  }))
-  await fetch('/api/projects', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(projects) })
-  toast('项目列表已保存')
+function removeProject(i) {
+  projects.splice(i, 1)
+  renderProjects()
 }
 
-// --- Posts ---
-async function loadPosts() {
-  const r = await fetch('/api/posts')
-  const posts = await r.json()
-  const el = document.getElementById('posts-list')
-  el.innerHTML = ''
-  posts.forEach(p => {
-    el.innerHTML += `<div class="border rounded-md p-3 flex items-center justify-between bg-white">
-      <div><span class="font-medium">${p.title}</span> <span class="text-xs text-zinc-500 ml-2">${p.date} · ${p.dir}</span></div>
-      <button onclick="editPost('${p.slug}')" class="text-sm text-blue-600">编辑</button>
-    </div>`
+async function importGithubRepo() {
+  const url = await ask('GitHub 仓库地址', 'https://github.com/user/repo', '例如 https://github.com/oioiovo/blog')
+  if (!url) return
+  const m = url.match(/github\.com[\/:]([^\/]+)\/([^\/\s]+?)(?:\.git)?$/)
+  if (!m) return toast('无法解析仓库地址')
+  const [, owner, repo] = m
+  try {
+    const r = await fetch(`https://api.github.com/repos/${owner}/${repo}`)
+    if (!r.ok) throw new Error('repo not found')
+    const data = await r.json()
+    projects.push({
+      name: data.name,
+      description: data.description || '',
+      href: data.html_url,
+      meta: `★ ${data.stargazers_count}`,
+    })
+    renderProjects()
+  } catch {
+    toast('获取失败，检查仓库地址是否公开')
+  }
+}
+
+async function saveProjects() {
+  projects = Array.from(document.querySelectorAll('#projects-list > div')).map((row, i) => ({
+    name: '', description: '',
+    href: row.querySelector('input[type=text],input:not([type=checkbox])').value,
+    showStars: row.querySelector('input[type=checkbox]').checked,
+    meta: '',
+  })).filter(p => p.href.trim())
+  await fetch('/api/projects', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(projects) })
+  toast('项目列表已保存')
+  refreshGitStatus()
+}
+
+// === Publish ===
+async function refreshGitStatus() {
+  try {
+    const r = await fetch('/api/git-status')
+    const s = await r.json()
+    const el = document.getElementById('git-status')
+    const btn = document.getElementById('btn-publish')
+    if (s.dirty) {
+      el.textContent = `${s.changed} 个文件待发布`
+      btn.classList.add('bg-blue-600'); btn.classList.remove('bg-zinc-400')
+    } else {
+      el.textContent = '已是最新'
+      btn.classList.remove('bg-blue-600'); btn.classList.add('bg-zinc-400')
+    }
+  } catch {}
+}
+
+async function publish() {
+  const btn = document.getElementById('btn-publish')
+  btn.disabled = true; btn.textContent = '发布中...'
+  try {
+    const r = await fetch('/api/publish', { method: 'POST' })
+    const res = await r.json()
+    if (!r.ok) toast('发布失败: ' + (res.error || r.status))
+    else toast(res.message || '已发布')
+  } catch (e) { toast('发布失败: ' + e.message) }
+  btn.disabled = false; btn.textContent = '发布'
+  refreshGitStatus()
+}
+
+// === Modal ===
+let modalCallback = null
+function openModal(title, defaultValue, placeholder) {
+  document.getElementById('modal-title').textContent = title
+  const inp = document.getElementById('modal-input')
+  inp.value = defaultValue || ''
+  inp.placeholder = placeholder || ''
+  document.getElementById('modal-overlay').classList.remove('hidden')
+  document.getElementById('modal-overlay').classList.add('flex')
+  setTimeout(() => { inp.focus(); inp.select() }, 50)
+  inp.onkeydown = (e) => { if (e.key === 'Enter') confirmModal(); if (e.key === 'Escape') closeModal() }
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.add('hidden')
+  document.getElementById('modal-overlay').classList.remove('flex')
+  modalCallback = null
+}
+function confirmModal() {
+  const val = document.getElementById('modal-input').value.trim()
+  const cb = modalCallback
+  closeModal()
+  if (cb) cb(modalIsConfirm ? true : val)
+}
+function ask(title, defaultValue, placeholder) {
+  return new Promise(resolve => {
+    modalIsConfirm = false
+    document.getElementById('modal-input').style.display = ''
+    modalCallback = (val) => resolve(val)
+    openModal(title, defaultValue, placeholder)
+  })
+}
+function confirmDlg(title) {
+  return new Promise(resolve => {
+    modalIsConfirm = true
+    document.getElementById('modal-input').style.display = 'none'
+    modalCallback = (ok) => resolve(ok)
+    openModal(title, '', '')
   })
 }
 
-async function editPost(slug) {
-  const r = await fetch(`/api/posts/${slug}`)
-  const post = await r.json()
-  currentPost = slug
-  document.getElementById('ed-title').value = post.title ?? ''
-  document.getElementById('ed-slug').value = post.slug ?? ''
-  document.getElementById('ed-summary').value = post.summary ?? ''
-  document.getElementById('ed-date').value = post.date ?? ''
-  document.getElementById('ed-dir').value = post.dir ?? ''
-  document.getElementById('ed-tags').value = (post.tags ?? []).join(', ')
-  document.getElementById('ed-content').value = post.content ?? ''
-  showTab('editor')
-}
-
-function newPost() {
-  currentPost = null
-  document.getElementById('ed-title').value = ''
-  document.getElementById('ed-slug').value = ''
-  document.getElementById('ed-summary').value = ''
-  document.getElementById('ed-date').value = new Date().toISOString().slice(0,10)
-  document.getElementById('ed-dir').value = 'notes'
-  document.getElementById('ed-tags').value = ''
-  document.getElementById('ed-content').value = ''
-  showTab('editor')
-}
-
-async function savePost() {
-  const body = {
-    title: document.getElementById('ed-title').value,
-    slug: document.getElementById('ed-slug').value,
-    summary: document.getElementById('ed-summary').value,
-    date: document.getElementById('ed-date').value,
-    dir: document.getElementById('ed-dir').value,
-    tags: document.getElementById('ed-tags').value.split(',').map(t=>t.trim()).filter(Boolean),
-    content: document.getElementById('ed-content').value,
+// === Drag post between directories ===
+function uploadToDir(dir) {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.md'
+  input.multiple = true
+  input.onchange = async () => {
+    for (const file of input.files) {
+      const content = await file.text()
+      let fm = {}, body = content
+      const m = content.match(/^---\n([\s\S]*?)\n---\n?/)
+      if (m) {
+        body = content.slice(m[0].length)
+        for (const line of m[1].split('\n')) {
+          const kv = line.match(/^(\w+):\s*(.*)/)
+          if (kv) fm[kv[1]] = kv[2].replace(/^["']|["']$/g, '')
+        }
+      }
+      const slug = file.name.replace(/\.md$/, '').toLowerCase().replace(/\s+/g, '-')
+      await fetch('/api/posts', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          slug,
+          title: fm.title || slug,
+          summary: fm.summary || '',
+          date: fm.date || new Date().toISOString().slice(0,10),
+          tags: fm.tags ? fm.tags.split(',').map(t=>t.trim()) : [],
+          dir: dir || 'notes',
+          content: body.trim()
+        })
+      })
+    }
+    toast(`已上传 ${input.files.length} 篇文章`)
+    loadTree()
+    refreshGitStatus()
   }
-  const url = currentPost ? `/api/posts/${currentPost}` : '/api/posts'
-  const method = currentPost ? 'PUT' : 'POST'
-  const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
-  if (!r.ok) { const e = await r.json(); toast('错误: ' + (e.error || r.status)); return }
-  toast('已保存')
-  currentPost = body.slug
-  loadPosts()
+  input.click()
 }
 
-async function deletePost() {
-  if (!currentPost) return
-  if (!confirm('确认删除这篇文章？')) return
-  await fetch(`/api/posts/${currentPost}`, { method:'DELETE' })
+function dragPost(e, dir, slug) {
+  e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'post', dir, slug }))
+  e.dataTransfer.effectAllowed = 'move'
+}
+
+function dragDir(e, path) {
+  e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'dir', path }))
+  e.dataTransfer.effectAllowed = 'move'
+}
+
+async function dropDir(e, targetDir) {
+  e.preventDefault()
+  e.stopPropagation()
+  e.currentTarget.classList.remove('bg-blue-100')
+  const data = e.dataTransfer.getData('text/plain')
+  if (!data) return
+  try {
+    const item = JSON.parse(data)
+    if (item.type === 'post') {
+      if (!item.slug || item.dir === targetDir) return
+      const r = await fetch(`/api/posts/${item.dir}/${item.slug}`)
+      const post = await r.json()
+      await fetch(`/api/posts/${item.dir}/${item.slug}`, {
+        method: 'PUT', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ ...post, dir: targetDir })
+      })
+      toast(`已移动到 ${targetDir}`)
+    } else if (item.type === 'dir') {
+      if (!item.path || item.path === targetDir) return
+      if (item.path.startsWith(targetDir + '/')) return
+      const newPath = targetDir + '/' + item.path.split('/').pop()
+      await fetch('/api/dirs', {
+        method: 'PUT', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ oldPath: item.path, newPath })
+      })
+      toast(`已移动目录到 ${newPath}`)
+    }
+    loadTree()
+    refreshGitStatus()
+  } catch {}
+}
+
+async function dropPost(e, targetDir) {
+  dropDir(e, targetDir)
+}
+
+// === Drag & drop import ===
+async function handleDrop(e) {
+  e.preventDefault()
+  e.currentTarget.classList.remove('bg-blue-50')
+  // ignore internal drag-drop (post moving between dirs)
+  const text = e.dataTransfer.getData('text/plain')
+  if (text && text.startsWith('{')) return
+  const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.md'))
+  if (!files.length) return
+  for (const file of files) {
+    const content = await file.text()
+    // parse frontmatter if present
+    let fm = {}, body = content
+    const m = content.match(/^---\n([\s\S]*?)\n---\n?/)
+    if (m) {
+      body = content.slice(m[0].length)
+      for (const line of m[1].split('\n')) {
+        const kv = line.match(/^(\w+):\s*(.*)/)
+        if (kv) fm[kv[1]] = kv[2].replace(/^["']|["']$/g, '')
+      }
+    }
+    const slug = file.name.replace(/\.md$/, '').toLowerCase().replace(/\s+/g, '-')
+    await fetch('/api/posts', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        slug,
+        title: fm.title || slug,
+        summary: fm.summary || '',
+        date: fm.date || new Date().toISOString().slice(0,10),
+        tags: fm.tags ? fm.tags.split(',').map(t=>t.trim()) : [],
+        dir: fm.dir || 'notes',
+        content: body.trim()
+      })
+    })
+  }
+  toast(`已导入 ${files.length} 篇文章`)
+  loadTree()
+  refreshGitStatus()
+}
+
+// === Context menu ===
+let ctxTarget = null  // { type: 'dir'|'file', dir, slug }
+
+function showCtx(e, type, dir, slug) {
+  e.preventDefault()
+  e.stopPropagation()
+  ctxTarget = type === 'dir' ? { type, dir } : { type, dir, slug }
+  const menu = document.getElementById('ctx-menu')
+  const isRoot = type === 'dir' && !dir
+  // show/hide file-only items
+  menu.querySelector('[data-action="new-dir"]').style.display = type === 'dir' ? '' : 'none'
+  menu.querySelector('[data-action="new-post"]').style.display = type === 'dir' ? '' : 'none'
+  menu.querySelector('[data-action="move"]').style.display = type === 'file' ? '' : 'none'
+  // hide rename/delete for root
+  menu.querySelector('[data-action="rename"]').style.display = isRoot ? 'none' : ''
+  menu.querySelector('[data-action="delete"]').style.display = isRoot ? 'none' : ''
+  menu.classList.remove('hidden')
+  menu.style.left = e.clientX + 'px'
+  menu.style.top = e.clientY + 'px'
+}
+
+function hideCtx() {
+  document.getElementById('ctx-menu').classList.add('hidden')
+}
+
+document.addEventListener('click', hideCtx)
+document.addEventListener('contextmenu', (e) => {
+  if (!e.target.closest('.tree-item')) hideCtx()
+})
+
+document.querySelectorAll('.ctx-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const action = item.dataset.action
+    const t = ctxTarget
+    hideCtx()
+    if (!t) return
+    if (action === 'new-post') { inlineState = { type: 'new-post', parentDir: t.dir }; loadTree() }
+    if (action === 'new-dir') { inlineState = { type: 'new-dir', parentDir: t.dir }; loadTree() }
+    if (action === 'upload') uploadToDir(t.dir)
+    if (action === 'rename') {
+      if (t.type === 'dir') renameDirPrompt(t.dir)
+      else renameFilePrompt(t.dir, t.slug)
+    }
+    if (action === 'delete') {
+      if (t.type === 'dir') deleteDirPrompt(t.dir)
+      else deleteFilePrompt(t.dir, t.slug)
+    }
+    if (action === 'move' && t.type === 'file') moveFilePrompt(t.dir, t.slug)
+  })
+})
+
+async function moveFilePrompt(dir, slug) {
+  const newDir = await ask('移动到目录', dir, '例如 frontend/react')
+  if (!newDir || newDir === dir) return
+  const r = await fetch(`/api/posts/${dir}/${slug}`)
+  const post = await r.json()
+  await fetch(`/api/posts/${dir}/${slug}`, {
+    method: 'PUT', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ ...post, dir: newDir })
+  })
+  toast(`已移动到 ${newDir}`)
+  loadTree()
+  refreshGitStatus()
+}
+
+async function renameFilePrompt(dir, slug) {
+  const newSlug = await ask('重命名文章为', slug, '新的 slug（英文）')
+  if (!newSlug || newSlug === slug) return
+  const r = await fetch(`/api/posts/${dir}/${slug}`)
+  const post = await r.json()
+  await fetch(`/api/posts/${dir}/${slug}`, {
+    method: 'PUT', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ ...post, slug: newSlug })
+  })
+  if (currentRef && currentRef.slug === slug) currentRef.slug = newSlug
+  toast('已重命名')
+  loadTree()
+}
+
+async function deleteFilePrompt(dir, slug) {
+  if (!await confirmDlg(`删除文章 "${slug}.md"？`)) return
+  await fetch(`/api/posts/${dir}/${slug}`, { method: 'DELETE' })
+  if (currentRef && currentRef.slug === slug) {
+    currentRef = null
+    document.getElementById('editor').classList.add('hidden')
+    document.getElementById('editor').classList.remove('flex')
+    document.getElementById('empty-state').classList.remove('hidden')
+  }
   toast('已删除')
-  showTab('posts')
+  loadTree()
+  refreshGitStatus()
 }
 
 // init
-loadSite()
-loadProjects()
-showTab('site')
+loadSite(); loadProjects(); loadAbout(); loadTree(); refreshGitStatus()
+showTab('posts')
 </script>
 </body>
 </html>
