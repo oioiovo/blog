@@ -82,7 +82,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
 
       <PostPager newer={newer} older={older} />
       </article>
-      <aside aria-label="文章目录" className="order-3 min-w-0 xl:order-3">
+      <aside aria-label="文章目录" className="order-3 min-w-0 xl:order-3 xl:sticky xl:top-24 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto">
         <PostTocAside items={toc} />
       </aside>
     </div>
