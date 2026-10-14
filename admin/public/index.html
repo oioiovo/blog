@@ -150,19 +150,14 @@
           <button onclick="saveProjects()" class="px-4 py-2 text-white rounded-md text-sm mono" style="background: var(--primary)">保存</button>
         </div>
 
-        <h2 class="text-base font-semibold mono pt-8 border-t mt-8" style="color: var(--primary); border-color: var(--border)">$ cat about.md</h2>
-        <div class="grid gap-4">
-          <textarea id="about-md" rows="6" class="w-full border rounded-md px-3 py-2 text-sm mono" style="border-color: var(--border); resize: vertical"></textarea>
-          <button onclick="saveAbout()" class="px-4 py-2 text-white rounded-md text-sm mono w-fit" style="background: var(--primary)">保存关于页</button>
-        </div>
-
-        <h2 class="text-base font-semibold mono pt-6" style="color: var(--primary)">$ cat stack.toml</h2>
+        <h2 class="text-base font-semibold mono pt-8 border-t mt-8" style="color: var(--primary); border-color: var(--border)">$ cat stack.toml</h2>
         <div id="about-stack-list" class="space-y-2"></div>
         <button onclick="addStackGroup()" class="mt-1 text-xs px-2 py-1 border rounded mono" style="border-color: var(--border)">+ 添加分组</button>
 
         <h2 class="text-base font-semibold mono pt-6" style="color: var(--primary)">$ cat history.log</h2>
         <div id="about-exp-list" class="space-y-2"></div>
         <button onclick="addExpItem()" class="mt-1 text-xs px-2 py-1 border rounded mono" style="border-color: var(--border)">+ 添加经历</button>
+        <button onclick="saveAbout()" class="mt-3 px-4 py-2 text-white rounded-md text-sm mono w-fit" style="background: var(--primary)">保存关于页</button>
       </div>
     </div>
 
@@ -374,6 +369,7 @@ async function newPostPrompt(dir) {
 }
 
 async function editReadme() {
+  showTab('posts')
   const r = await fetch('/api/about')
   currentRef = { readme: true }
   document.getElementById('ed-title').value = 'README.md'
@@ -526,8 +522,6 @@ async function loadProjects() {
 let aboutData = { stack: [], experience: [] }
 
 async function loadAbout() {
-  const r = await fetch('/api/about')
-  document.getElementById('about-md').value = await r.text()
   const jr = await fetch('/api/about-json')
   aboutData = await jr.json()
   renderAboutStack()
@@ -568,8 +562,6 @@ function addStackGroup() { aboutData.stack.push({ group: '', items: '' }); rende
 function addExpItem() { aboutData.experience.push({ period: '', role: '', org: '' }); renderAboutExp() }
 
 async function saveAbout() {
-  // save markdown
-  await fetch('/api/about', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ content: document.getElementById('about-md').value }) })
   // save structured
   aboutData.stack = Array.from(document.querySelectorAll('#about-stack-list > div')).map((_, i) => ({
     group: document.getElementById(`sg-${i}`).value,
