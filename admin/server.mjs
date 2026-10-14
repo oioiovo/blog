@@ -94,7 +94,7 @@ app.put('/api/projects', (req, res) => {
   res.json({ ok: true })
 })
 
-const ABOUT_MD = path.join(ROOT, 'content', 'about.md')
+const ABOUT_MD = path.join(ROOT, 'content', 'README.md')
 
 // About page markdown
 app.get('/api/about', (req, res) => {
@@ -218,7 +218,7 @@ app.delete(/^\/api\/posts\/(.+)$/, (req, res) => {
 })
 
 // Only track blog content + site config for publish
-const TRACKED = ['content/posts/', 'content/about.md', 'config/', 'lib/', 'app/', 'components/']
+const TRACKED = ['content/posts/', 'content/README.md', 'config/', 'lib/', 'app/', 'components/']
 function trackedStatus() {
   const git = (args) => execSync(`git ${args}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe','pipe','pipe'] })
   const all = git('status --porcelain').trim()

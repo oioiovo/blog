@@ -17,7 +17,7 @@ export function generateStaticParams() {
 }
 
 export default function AboutPage() {
-  const raw = fs.readFileSync(path.join(process.cwd(), 'content', 'about.md'), 'utf8')
+  const raw = fs.readFileSync(path.join(process.cwd(), 'content/README.md'), 'utf8')
   const { content } = matter(raw)
 
   return (
