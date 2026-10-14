@@ -105,6 +105,13 @@ app.put('/api/about', (req, res) => {
   res.json({ ok: true })
 })
 
+// About page structured config (stack, experience)
+app.get('/api/about-json', (req, res) => res.json(JSON.parse(fs.readFileSync(ABOUT_JSON, 'utf8'))))
+app.put('/api/about-json', (req, res) => {
+  fs.writeFileSync(ABOUT_JSON, JSON.stringify(req.body, null, 2) + '\n')
+  res.json({ ok: true })
+})
+
 // Tree
 app.get('/api/tree', (req, res) => {
   res.json(walkDir(''))

@@ -146,9 +146,17 @@
 
         <h2 class="text-base font-semibold mono pt-8 border-t mt-8" style="color: var(--primary); border-color: var(--border)">$ cat about.md</h2>
         <div class="grid gap-4">
-          <textarea id="about-md" rows="15" class="w-full border rounded-md px-3 py-2 text-sm mono" style="border-color: var(--border); resize: vertical"></textarea>
+          <textarea id="about-md" rows="6" class="w-full border rounded-md px-3 py-2 text-sm mono" style="border-color: var(--border); resize: vertical"></textarea>
           <button onclick="saveAbout()" class="px-4 py-2 text-white rounded-md text-sm mono w-fit" style="background: var(--primary)">保存关于页</button>
         </div>
+
+        <h2 class="text-base font-semibold mono pt-6" style="color: var(--primary)">$ cat stack.toml</h2>
+        <div id="about-stack-list" class="space-y-2"></div>
+        <button onclick="addStackGroup()" class="mt-1 text-xs px-2 py-1 border rounded mono" style="border-color: var(--border)">+ 添加分组</button>
+
+        <h2 class="text-base font-semibold mono pt-6" style="color: var(--primary)">$ cat history.log</h2>
+        <div id="about-exp-list" class="space-y-2"></div>
+        <button onclick="addExpItem()" class="mt-1 text-xs px-2 py-1 border rounded mono" style="border-color: var(--border)">+ 添加经历</button>
       </div>
     </div>
 
@@ -485,13 +493,65 @@ async function loadProjects() {
   renderProjects()
 }
 
+let aboutData = { stack: [], experience: [] }
+
 async function loadAbout() {
   const r = await fetch('/api/about')
   document.getElementById('about-md').value = await r.text()
+  const jr = await fetch('/api/about-json')
+  aboutData = await jr.json()
+  renderAboutStack()
+  renderAboutExp()
 }
 
+function renderAboutStack() {
+  const sl = document.getElementById('about-stack-list')
+  sl.innerHTML = ''
+  aboutData.stack.forEach((s, i) => {
+    sl.innerHTML += `<div class="flex gap-2">
+      <input id="sg-${i}" value="${s.group}" placeholder="分组" class="border rounded px-2 py-1 text-sm w-32" style="border-color: var(--border)">
+      <input id="si-${i}" value="${s.items}" placeholder="内容" class="flex-1 border rounded px-2 py-1 text-sm" style="border-color: var(--border)">
+      <button onclick="aboutData.stack.splice(${i},1);renderAboutStack()" class="px-1" style="color: oklch(0.577 0.245 27)">×</button>
+    </div>`
+  })
+}
+
+function renderAboutExp() {
+  const el = document.getElementById('about-exp-list')
+  el.innerHTML = ''
+  aboutData.experience.forEach((e, i) => {
+    const [start, end] = (e.period || '').split(' — ')
+    const isPresent = !end || end === '至今'
+    el.innerHTML += `<div class="flex gap-2 items-center">
+      <input type="month" id="es-${i}" value="${start || ''}" class="border rounded px-2 py-1 text-sm" style="border-color: var(--border)">
+      <span class="text-zinc-400">—</span>
+      <input type="month" id="ee-${i}" value="${isPresent ? '' : end || ''}" ${isPresent ? 'disabled' : ''} class="border rounded px-2 py-1 text-sm" style="border-color: var(--border)">
+      <label class="flex items-center gap-1 text-xs text-zinc-500 whitespace-nowrap"><input type="checkbox" id="epresent-${i}" ${isPresent ? 'checked' : ''} onchange="document.getElementById('ee-${i}').disabled=this.checked">至今</label>
+      <input id="er-${i}" value="${e.role}" placeholder="职位" class="flex-1 border rounded px-2 py-1 text-sm" style="border-color: var(--border)">
+      <input id="eo-${i}" value="${e.org}" placeholder="公司" class="flex-1 border rounded px-2 py-1 text-sm" style="border-color: var(--border)">
+      <button onclick="aboutData.experience.splice(${i},1);renderAboutExp()" class="px-1" style="color: oklch(0.577 0.245 27)">×</button>
+    </div>`
+  })
+}
+
+function addStackGroup() { aboutData.stack.push({ group: '', items: '' }); renderAboutStack() }
+function addExpItem() { aboutData.experience.push({ period: '', role: '', org: '' }); renderAboutExp() }
+
 async function saveAbout() {
+  // save markdown
   await fetch('/api/about', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ content: document.getElementById('about-md').value }) })
+  // save structured
+  aboutData.stack = Array.from(document.querySelectorAll('#about-stack-list > div')).map((_, i) => ({
+    group: document.getElementById(`sg-${i}`).value,
+    items: document.getElementById(`si-${i}`).value,
+  }))
+  aboutData.experience = Array.from(document.querySelectorAll('#about-exp-list > div')).map((_, i) => {
+    const start = document.getElementById(`es-${i}`).value
+    const present = document.getElementById(`epresent-${i}`).checked
+    const end = present ? '至今' : (document.getElementById(`ee-${i}`).value || '')
+    return { period: `${start} — ${end}`, role: document.getElementById(`er-${i}`).value, org: document.getElementById(`eo-${i}`).value }
+  })
+  await fetch('/api/about-json', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(aboutData) })
   toast('关于页已保存')
   refreshGitStatus()
 }
