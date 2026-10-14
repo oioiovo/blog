@@ -1,4 +1,11 @@
 {
+  "experience": [
+    {
+      "org": "某 手机 公司",
+      "period": "2022-07 — 2026-09",
+      "role": "系统开发工程师 · 系统兼容性"
+    }
+  ],
   "intro": [
     "哈喽"
   ],
@@ -9,18 +16,11 @@
     },
     {
       "group": "工具",
-      "items": "Docker · GitHub Actions"
+      "items": "Git · Frida · gdb"
     },
     {
       "group": "Android",
       "items": "Framework"
-    }
-  ],
-  "experience": [
-    {
-      "period": "2022-07 — 2026-09",
-      "role": "系统开发工程师 · 系统兼容性",
-      "org": "某 手机 公司"
     }
   ]
 }

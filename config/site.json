@@ -1,11 +1,11 @@
 {
-  "name": "谌",
-  "handle": "oioiovo",
-  "title": "谌 · 个人博客",
-  "tagline": "但行好事，莫问前程",
   "bio": "你已来到知识的荒漠",
   "description": "思考、记录、分享",
   "email": "shirley.chen0x0@icloud.com",
-  "url": "https://oioiovo.github.io/blog",
-  "github": "https://github.com/oioiovo"
+  "github": "https://github.com/oioiovo",
+  "handle": "oioiovo",
+  "name": "谌",
+  "tagline": "但行好事，莫问前程",
+  "title": "谌 · 个人博客",
+  "url": "https://oioiovo.github.io/blog"
 }
