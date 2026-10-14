@@ -17,7 +17,9 @@ import {
 } from '@/lib/posts'
 
 export function generateStaticParams() {
-  return getAllPosts().map((post) => ({ slug: post.slug }))
+  const posts = getAllPosts()
+  if (!posts.length) return [{ slug: '__placeholder__' }]
+  return posts.map((post) => ({ slug: post.slug }))
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
