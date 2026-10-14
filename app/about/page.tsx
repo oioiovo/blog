@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import Image from 'next/image'
 import matter from 'gray-matter'
 import fs from 'fs'
 import path from 'path'
@@ -28,16 +27,6 @@ export default function AboutPage() {
           {'cat README.md'}
         </p>
         <h1 className="text-3xl font-semibold tracking-tight">{'关于我'}</h1>
-        <div className="overflow-hidden rounded-lg border border-border">
-          <Image
-            src="/images/desk.png"
-            alt="摆着机械键盘、手绘架构图笔记本和一杯茶的书桌"
-            width={1200}
-            height={800}
-            className="aspect-[16/9] w-full object-cover"
-            priority
-          />
-        </div>
         <PostBody content={content} />
       </header>
 
