@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicehash/tauri/dev/crates/tauri-config-schema/schema.json",
+  "productName": "博客管理后台",
+  "version": "0.1.0",
+  "identifier": "com.oioiovo.blog-admin",
+  "build": {
+    "frontendDist": "../admin/public",
+    "beforeDevCommand": "node admin/server.mjs",
+    "devUrl": "http://localhost:3001"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "博客管理后台",
+        "width": 1100,
+        "height": 800,
+        "resizable": true,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "externalBin": [
+      "bin/node"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ]
+  }
+}

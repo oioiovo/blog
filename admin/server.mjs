@@ -15,6 +15,10 @@ const ABOUT_JSON = path.join(ROOT, 'config', 'about.json')
 const app = express()
 app.use(express.json())
 app.use(express.static(path.join(__dirname, 'public')))
+app.use('/images', express.static(path.join(ROOT, 'public', 'images')))
+app.use('/blog/images', express.static(path.join(ROOT, 'public', 'images')))
+
+const IMAGES_DIR = path.join(ROOT, 'public', 'images')
 
 // --- helpers ---
 function normalizeDate(d) {
@@ -109,6 +113,33 @@ app.put('/api/about', (req, res) => {
 app.get('/api/about-json', (req, res) => res.json(JSON.parse(fs.readFileSync(ABOUT_JSON, 'utf8'))))
 app.put('/api/about-json', (req, res) => {
   fs.writeFileSync(ABOUT_JSON, JSON.stringify(req.body, null, 2) + '\n')
+  res.json({ ok: true })
+})
+
+// Image upload
+app.get('/api/images', (req, res) => {
+  if (!fs.existsSync(IMAGES_DIR)) return res.json([])
+  const files = fs.readdirSync(IMAGES_DIR).filter(f => /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(f))
+  res.json(files.map(name => ({ name, url: `/blog/images/${name}` })))
+})
+
+app.post('/api/images', express.raw({ type: 'image/*', limit: '10mb' }), (req, res) => {
+  const name = req.query.name
+  if (!name || !/^[\w.-]+\.(png|jpg|jpeg|gif|webp|svg)$/i.test(name)) {
+    return res.status(400).json({ error: 'invalid filename' })
+  }
+  if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true })
+  fs.writeFileSync(path.join(IMAGES_DIR, name), req.body)
+  res.json({ ok: true, url: `/blog/images/${name}` })
+})
+
+app.delete('/api/images/:name', (req, res) => {
+  const name = req.params.name
+  if (!/^[\w.-]+\.(png|jpg|jpeg|gif|webp|svg)$/i.test(name)) {
+    return res.status(400).json({ error: 'invalid filename' })
+  }
+  const p = path.join(IMAGES_DIR, name)
+  if (fs.existsSync(p)) fs.unlinkSync(p)
   res.json({ ok: true })
 })
 
@@ -218,13 +249,13 @@ app.delete(/^\/api\/posts\/(.+)$/, (req, res) => {
 })
 
 // Only track blog content + site config for publish
-const TRACKED = ['content/posts/', 'content/README.md', 'config/', 'lib/', 'app/', 'components/']
+const TRACKED = ['content/posts/', 'content/README.md', 'config/', 'lib/', 'app/', 'components/', 'public/images/']
 function trackedStatus() {
   const git = (args) => execSync(`git ${args}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe','pipe','pipe'] })
   const all = git('status --porcelain').trim()
   if (!all) return []
   return all.split('\n').filter(line => {
-    const path = line.slice(3).trim()
+    let path = line.slice(3).trim().replace(/^"|"$/g, '')
     return TRACKED.some(p => path.startsWith(p))
   })
 }
