@@ -77,6 +77,12 @@
 
   <!-- Sidebar -->
   <aside class="w-72 border-r flex flex-col shrink-0" style="border-color: var(--border); background: var(--card)">
+    <div class="px-3 py-2 border-b" style="border-color: var(--border)">
+      <div class="tree-item flex items-center gap-1 px-1 py-1 rounded text-sm" id="readme-item" onclick="editReadme()">
+        <span>📄</span>
+        <span class="flex-1 truncate mono">README.md</span>
+      </div>
+    </div>
     <div class="flex items-center justify-between px-3 py-2 border-b" style="border-color: var(--border)">
       <span class="text-xs mono" style="color: var(--muted-fg)">content/posts</span>
     </div>
@@ -111,7 +117,7 @@
           </div>
         </div>
         <!-- Metadata always visible -->
-        <div class="px-5 py-3 border-b shrink-0" style="border-color: var(--border); background: var(--card)">
+        <div id="ed-meta" class="px-5 py-3 border-b shrink-0" style="border-color: var(--border); background: var(--card)">
           <input id="ed-title" placeholder="标题" class="text-lg font-semibold border-0 border-b px-1 py-1 bg-transparent w-full" style="border-color: var(--border)">
           <div class="grid grid-cols-3 gap-2 mt-2">
             <input id="ed-slug" placeholder="slug" class="border rounded px-2 py-1 text-xs mono" style="border-color: var(--border)">
@@ -367,6 +373,21 @@ async function newPostPrompt(dir) {
   setMode('edit')
 }
 
+async function editReadme() {
+  const r = await fetch('/api/about')
+  currentRef = { readme: true }
+  document.getElementById('ed-title').value = 'README.md'
+  document.getElementById('ed-slug').value = ''
+  document.getElementById('ed-summary').value = ''
+  document.getElementById('ed-date').value = ''
+  document.getElementById('ed-tags').value = ''
+  document.getElementById('ed-content').value = await r.text()
+  document.getElementById('ed-meta').style.display = 'none'
+  showEditor()
+  setMode('split')
+  updatePreview()
+}
+
 async function editPost(dir, fileSlug) {
   const r = await fetch(`/api/posts/${dir}/${fileSlug}`)
   const post = await r.json()
@@ -377,6 +398,7 @@ async function editPost(dir, fileSlug) {
   document.getElementById('ed-date').value = post.date ?? ''
   document.getElementById('ed-tags').value = (post.tags ?? []).join(', ')
   document.getElementById('ed-content').value = post.content ?? ''
+  document.getElementById('ed-meta').style.display = ''
   showEditor()
   setMode('split')
   updatePreview()
@@ -431,6 +453,13 @@ function updatePreview() {
 }
 
 async function savePost() {
+  // README.md special case
+  if (currentRef && currentRef.readme) {
+    await fetch('/api/about', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ content: document.getElementById('ed-content').value }) })
+    toast('README.md 已保存')
+    refreshGitStatus()
+    return
+  }
   const body = {
     title: document.getElementById('ed-title').value,
     slug: document.getElementById('ed-slug').value,
@@ -456,6 +485,7 @@ async function savePost() {
 
 async function deletePost() {
   if (!currentRef) return
+  if (currentRef.readme) { toast('README.md 不可删除'); return }
   if (!await confirmDlg('确认删除这篇文章？')) return
   await fetch(`/api/posts/${currentRef.dir}/${currentRef.fileSlug}`, { method: 'DELETE' })
   toast('已删除')
