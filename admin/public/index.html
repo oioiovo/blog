@@ -142,13 +142,10 @@
       <div class="max-w-xl space-y-4">
         <h2 class="text-base font-semibold mono" style="color: var(--primary)">$ cat site.json</h2>
         <div id="site-form" class="grid gap-3"></div>
-        <button onclick="saveSite()" class="px-4 py-2 text-white rounded-md text-sm mono" style="background: var(--primary)">保存</button>
+
         <h2 class="text-base font-semibold mono pt-6" style="color: var(--primary)">$ ls ~/projects</h2>
         <div id="projects-list" class="space-y-3"></div>
-        <div class="flex gap-2">
-          <button onclick="addProject()" class="px-3 py-1.5 border rounded-md text-sm mono" style="border-color: var(--border)">+ 添加项目</button>
-          <button onclick="saveProjects()" class="px-4 py-2 text-white rounded-md text-sm mono" style="background: var(--primary)">保存</button>
-        </div>
+        <button onclick="addProject()" class="px-3 py-1.5 border rounded-md text-sm mono" style="border-color: var(--border)">+ 添加项目</button>
 
         <h2 class="text-base font-semibold mono pt-8 border-t mt-8" style="color: var(--primary); border-color: var(--border)">$ cat stack.toml</h2>
         <div id="about-stack-list" class="space-y-2"></div>
@@ -157,7 +154,8 @@
         <h2 class="text-base font-semibold mono pt-6" style="color: var(--primary)">$ cat history.log</h2>
         <div id="about-exp-list" class="space-y-2"></div>
         <button onclick="addExpItem()" class="mt-1 text-xs px-2 py-1 border rounded mono" style="border-color: var(--border)">+ 添加经历</button>
-        <button onclick="saveAbout()" class="mt-3 px-4 py-2 text-white rounded-md text-sm mono w-fit" style="background: var(--primary)">保存关于页</button>
+
+        <button onclick="saveAll()" class="mt-6 px-4 py-2 text-white rounded-md text-sm mono" style="background: var(--primary)">保存全部</button>
       </div>
     </div>
 
@@ -509,8 +507,14 @@ async function saveSite() {
   const site = {}
   form.querySelectorAll('input').forEach(inp => { site[inp.id.replace('site-','')] = inp.value })
   await fetch('/api/site', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(site) })
-  toast('站点配置已保存')
   refreshGitStatus()
+}
+
+async function saveAll() {
+  await saveSite()
+  await saveProjects()
+  await saveAbout()
+  toast('全部已保存')
 }
 
 async function loadProjects() {
@@ -574,7 +578,6 @@ async function saveAbout() {
     return { period: `${start} — ${end}`, role: document.getElementById(`er-${i}`).value, org: document.getElementById(`eo-${i}`).value }
   })
   await fetch('/api/about-json', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(aboutData) })
-  toast('关于页已保存')
   refreshGitStatus()
 }
 
@@ -630,7 +633,6 @@ async function saveProjects() {
     meta: '',
   })).filter(p => p.href.trim())
   await fetch('/api/projects', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(projects) })
-  toast('项目列表已保存')
   refreshGitStatus()
 }
 
