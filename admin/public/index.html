@@ -146,21 +146,7 @@
 
         <h2 class="text-base font-semibold mono pt-8 border-t mt-8" style="color: var(--primary); border-color: var(--border)">$ cat about.md</h2>
         <div class="grid gap-4">
-          <div>
-            <label class="text-xs font-medium text-zinc-500">自我介绍段落</label>
-            <div id="about-intro-list" class="mt-1 space-y-2"></div>
-            <button onclick="addIntroPara()" class="mt-1 text-xs px-2 py-1 border rounded mono" style="border-color: var(--border)">+ 添加段落</button>
-          </div>
-          <div>
-            <label class="text-xs font-medium text-zinc-500">技术栈分组</label>
-            <div id="about-stack-list" class="mt-1 space-y-2"></div>
-            <button onclick="addStackGroup()" class="mt-1 text-xs px-2 py-1 border rounded mono" style="border-color: var(--border)">+ 添加分组</button>
-          </div>
-          <div>
-            <label class="text-xs font-medium text-zinc-500">工作经历</label>
-            <div id="about-exp-list" class="mt-1 space-y-2"></div>
-            <button onclick="addExpItem()" class="mt-1 text-xs px-2 py-1 border rounded mono" style="border-color: var(--border)">+ 添加经历</button>
-          </div>
+          <textarea id="about-md" rows="15" class="w-full border rounded-md px-3 py-2 text-sm mono" style="border-color: var(--border); resize: vertical"></textarea>
           <button onclick="saveAbout()" class="px-4 py-2 text-white rounded-md text-sm mono w-fit" style="background: var(--primary)">保存关于页</button>
         </div>
       </div>
@@ -308,16 +294,16 @@ function renderNode(node, depth) {
   }
   for (const f of node.files) {
     const pad = depth * 14 + 22
-    const active = currentRef && currentRef.dir === f.dir && currentRef.slug === f.slug ? 'active' : ''
+    const active = currentRef && currentRef.dir === (f.dir||'') && currentRef.fileSlug === f.fileSlug ? 'active' : ''
     html += `
       <div class="tree-item tree-file flex items-center gap-1 px-1 py-1 rounded ${active}" style="padding-left:${pad}px"
            draggable="true"
-           ondragstart="dragPost(event,'${f.dir || ''}','${f.slug}')"
-           onclick="editPost('${f.dir || ''}', '${f.slug}')"
-           oncontextmenu="showCtx(event, 'file', '${f.dir || ''}', '${f.slug}')">
+           ondragstart="dragPost(event,'${f.dir || ''}','${f.fileSlug}')"
+           onclick="editPost('${f.dir || ''}', '${f.fileSlug}')"
+           oncontextmenu="showCtx(event, 'file', '${f.dir || ''}', '${f.fileSlug}')">
         <span class="text-zinc-300 cursor-grab select-none" title="拖拽移动">⠿</span>
         <span>📄</span>
-        <span class="flex-1 truncate">${f.slug}.md</span>
+        <span class="flex-1 truncate">${f.fileSlug}.md</span>
       </div>`
   }
   return html
@@ -373,10 +359,10 @@ async function newPostPrompt(dir) {
   setMode('edit')
 }
 
-async function editPost(dir, slug) {
-  const r = await fetch(`/api/posts/${dir}/${slug}`)
+async function editPost(dir, fileSlug) {
+  const r = await fetch(`/api/posts/${dir}/${fileSlug}`)
   const post = await r.json()
-  currentRef = { dir, slug }
+  currentRef = { dir, fileSlug }
   document.getElementById('ed-title').value = post.title ?? ''
   document.getElementById('ed-slug').value = post.slug ?? ''
   document.getElementById('ed-summary').value = post.summary ?? ''
@@ -448,13 +434,13 @@ async function savePost() {
   }
   let r
   if (currentRef) {
-    r = await fetch(`/api/posts/${currentRef.dir}/${currentRef.slug}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) })
+    r = await fetch(`/api/posts/${currentRef.dir}/${currentRef.fileSlug}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) })
   } else {
     r = await fetch('/api/posts', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) })
   }
   if (!r.ok) { const e = await r.json(); toast('错误: ' + (e.error || r.status)); return }
   toast('已保存')
-  currentRef = { dir: body.dir, slug: body.slug }
+  currentRef = { dir: body.dir, fileSlug: body.slug || body.title?.toLowerCase().replace(/\s+/g,'-') }
   expandedDirs.add(body.dir)
   loadTree()
   refreshGitStatus()
@@ -463,7 +449,7 @@ async function savePost() {
 async function deletePost() {
   if (!currentRef) return
   if (!await confirmDlg('确认删除这篇文章？')) return
-  await fetch(`/api/posts/${currentRef.dir}/${currentRef.slug}`, { method: 'DELETE' })
+  await fetch(`/api/posts/${currentRef.dir}/${currentRef.fileSlug}`, { method: 'DELETE' })
   toast('已删除')
   currentRef = null
   document.getElementById('editor').classList.add('hidden')
@@ -499,85 +485,13 @@ async function loadProjects() {
   renderProjects()
 }
 
-let aboutData = { intro: [], stack: [], experience: [] }
-
-function syncAboutFromDOM() {
-  aboutData.intro = Array.from(document.querySelectorAll('#about-intro-list textarea')).map(t => t.value)
-  aboutData.stack = Array.from(document.querySelectorAll('#about-stack-list > div')).map((_, i) => ({
-    group: document.getElementById(`sg-${i}`)?.value ?? '',
-    items: document.getElementById(`si-${i}`)?.value ?? '',
-  }))
-  aboutData.experience = Array.from(document.querySelectorAll('#about-exp-list > div')).map((_, i) => {
-    const start = document.getElementById(`es-${i}`)?.value ?? ''
-    const present = document.getElementById(`epresent-${i}`)?.checked ?? false
-    const end = present ? '至今' : (document.getElementById(`ee-${i}`)?.value || '')
-    return { period: `${start} — ${end}`, role: document.getElementById(`er-${i}`)?.value ?? '', org: document.getElementById(`eo-${i}`)?.value ?? '' }
-  })
-}
-
 async function loadAbout() {
   const r = await fetch('/api/about')
-  aboutData = await r.json()
-  renderAbout()
+  document.getElementById('about-md').value = await r.text()
 }
-
-function renderAbout() {
-  // intro
-  const il = document.getElementById('about-intro-list')
-  il.innerHTML = ''
-  aboutData.intro.forEach((p, i) => {
-    il.innerHTML += `<div class="flex gap-2"><textarea rows="2" id="ai-${i}" class="flex-1 border rounded px-2 py-1 text-sm" style="border-color: var(--border)">${p}</textarea><button onclick="syncAboutFromDOM();aboutData.intro.splice(${i},1);renderAbout()" class="px-1" style="color: oklch(0.577 0.245 27)">×</button></div>`
-  })
-  // stack
-  const sl = document.getElementById('about-stack-list')
-  sl.innerHTML = ''
-  aboutData.stack.forEach((s, i) => {
-    sl.innerHTML += `<div class="flex gap-2">
-      <input id="sg-${i}" value="${s.group}" placeholder="分组" class="border rounded px-2 py-1 text-sm w-32">
-      <input id="si-${i}" value="${s.items}" placeholder="内容" class="flex-1 border rounded px-2 py-1 text-sm">
-      <button onclick="syncAboutFromDOM();aboutData.stack.splice(${i},1);renderAbout()" class="px-1" style="color: oklch(0.577 0.245 27)">×</button>
-    </div>`
-  })
-  // experience
-  const el = document.getElementById('about-exp-list')
-  el.innerHTML = ''
-  aboutData.experience.forEach((e, i) => {
-    const [start, end] = (e.period || '').split(' — ')
-    const isPresent = !end || end === '至今'
-    el.innerHTML += `<div class="flex gap-2 items-center">
-      <input type="month" id="es-${i}" value="${start || ''}" class="border rounded px-2 py-1 text-sm">
-      <span class="text-zinc-400">—</span>
-      <input type="month" id="ee-${i}" value="${isPresent ? '' : end || ''}" ${isPresent ? 'disabled' : ''} class="border rounded px-2 py-1 text-sm">
-      <label class="flex items-center gap-1 text-xs text-zinc-500 whitespace-nowrap"><input type="checkbox" id="epresent-${i}" ${isPresent ? 'checked' : ''} onchange="document.getElementById('ee-${i}').disabled=this.checked">至今</label>
-      <input id="er-${i}" value="${e.role}" placeholder="职位" class="flex-1 border rounded px-2 py-1 text-sm">
-      <input id="eo-${i}" value="${e.org}" placeholder="公司" class="flex-1 border rounded px-2 py-1 text-sm">
-      <button onclick="syncAboutFromDOM();aboutData.experience.splice(${i},1);renderAbout()" class="px-1" style="color: oklch(0.577 0.245 27)">×</button>
-    </div>`
-  })
-}
-
-function addIntroPara() { syncAboutFromDOM(); aboutData.intro.push(''); renderAbout() }
-function addStackGroup() { syncAboutFromDOM(); aboutData.stack.push({ group: '', items: '' }); renderAbout() }
-function addExpItem() { syncAboutFromDOM(); aboutData.experience.push({ period: '', role: '', org: '' }); renderAbout() }
 
 async function saveAbout() {
-  // read from DOM
-  aboutData.intro = Array.from(document.querySelectorAll('#about-intro-list textarea')).map(t => t.value.trim()).filter(Boolean)
-  aboutData.stack = Array.from(document.querySelectorAll('#about-stack-list > div')).map((_, i) => ({
-    group: document.getElementById(`sg-${i}`).value,
-    items: document.getElementById(`si-${i}`).value,
-  }))
-  aboutData.experience = Array.from(document.querySelectorAll('#about-exp-list > div')).map((_, i) => {
-    const start = document.getElementById(`es-${i}`).value
-    const present = document.getElementById(`epresent-${i}`).checked
-    const end = present ? '至今' : (document.getElementById(`ee-${i}`).value || '')
-    return {
-      period: `${start} — ${end}`,
-      role: document.getElementById(`er-${i}`).value,
-      org: document.getElementById(`eo-${i}`).value,
-    }
-  })
-  await fetch('/api/about', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(aboutData) })
+  await fetch('/api/about', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ content: document.getElementById('about-md').value }) })
   toast('关于页已保存')
   refreshGitStatus()
 }
