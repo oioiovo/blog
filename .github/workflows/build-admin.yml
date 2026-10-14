@@ -36,8 +36,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload exe
+      - name: Download portable Node
+        shell: pwsh
+        run: |
+          $url = "https://nodejs.org/dist/v22.11.0/node-v22.11.0-win-x64.zip"
+          Invoke-WebRequest -Uri $url -OutFile node.zip
+          Expand-Archive node.zip -DestinationPath .
+          Copy-Item node-v22.11.0-win-x64/node.exe src-tauri/target/release/node.exe
+
+      - name: Upload release bundle
         uses: actions/upload-artifact@v4
         with:
-          name: blog-admin
-          path: src-tauri/target/release/blog-admin.exe
+          name: blog-admin-windows
+          path: |
+            src-tauri/target/release/blog-admin.exe
+            src-tauri/target/release/node.exe

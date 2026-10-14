@@ -4,22 +4,28 @@ use tauri::Manager;
 
 const REPO_URL: &str = "git@github.com:oioiovo/blog.git";
 
+fn exe_dir() -> PathBuf {
+    std::env::current_exe().unwrap().parent().unwrap().to_path_buf()
+}
+
 fn repo_dir() -> PathBuf {
-    let exe = std::env::current_exe().expect("cannot get exe path");
-    exe.parent().unwrap().join("blog")
+    exe_dir().join("blog")
 }
 
 #[cfg(not(debug_assertions))]
-fn bundled_node(app: &tauri::App) -> PathBuf {
-    // In production, external bin is next to the exe
-    let exe = std::env::current_exe().expect("cannot get exe path");
-    exe.parent().unwrap().join("node.exe")
+fn bundled_node() -> PathBuf {
+    exe_dir().join("node.exe")
 }
 
 #[cfg(not(debug_assertions))]
 fn ensure_repo() -> Result<(), String> {
     let dir = repo_dir();
     if dir.join(".git").exists() {
+        // pull latest
+        let _ = Command::new("git")
+            .arg("pull")
+            .current_dir(&dir)
+            .output();
         return Ok(());
     }
     println!("[setup] cloning repo to {:?}", dir);
@@ -39,10 +45,10 @@ fn ensure_repo() -> Result<(), String> {
 }
 
 #[cfg(not(debug_assertions))]
-fn start_admin_server(app: &tauri::App) -> Result<(), String> {
+fn start_admin_server() -> Result<(), String> {
     let dir = repo_dir();
     let server = dir.join("admin").join("server.mjs");
-    let node = bundled_node(app);
+    let node = bundled_node();
     println!("[setup] starting admin server: {} via {:?}", server.display(), node);
     Command::new(&node)
         .arg(&server)
@@ -60,10 +66,10 @@ fn main() {
                 if let Err(e) = ensure_repo() {
                     println!("[setup] repo error: {}", e);
                 }
-                if let Err(e) = start_admin_server(app) {
+                if let Err(e) = start_admin_server() {
                     println!("[setup] server error: {}", e);
                 }
-                std::thread::sleep(std::time::Duration::from_millis(1500));
+                std::thread::sleep(std::time::Duration::from_millis(2000));
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.eval("window.location.href = 'http://localhost:3001';");
                 }
