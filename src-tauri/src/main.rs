@@ -363,6 +363,7 @@ async fn git_status() -> impl IntoResponse {
 
 async fn publish() -> axum::response::Response {
     let c = tracked_status();
+    log::info!("publish requested, {} changed files", c.len());
     if c.is_empty() {
         return Json(serde_json::json!({ "ok": true, "message": "no changes" })).into_response();
     }
@@ -372,8 +373,14 @@ async fn publish() -> axum::response::Response {
     let stamp = chrono_like_now();
     let _ = git(&["commit", "-m", &format!("chore: publish {} files at {}", c.len(), stamp)]);
     match git(&["push", "origin", "main"]) {
-        Ok(_) => Json(serde_json::json!({ "ok": true, "message": format!("published {} files", c.len()) })).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
+        Ok(_) => {
+            log::info!("published {} files", c.len());
+            Json(serde_json::json!({ "ok": true, "message": format!("published {} files", c.len()) })).into_response()
+        }
+        Err(e) => {
+            log::error!("git push failed: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, e).into_response()
+        }
     }
 }
 
@@ -394,16 +401,20 @@ fn chrono_like_now() -> String {
 fn ensure_repo() -> Result<(), String> {
     let dir = repo_dir();
     if dir.join(".git").exists() {
+        log::info!("pulling latest repo");
         let _ = git(&["pull"]);
         return Ok(());
     }
+    log::info!("cloning repo to {:?}", dir);
     let out = Command::new("git")
         .args(["clone", "git@github.com:oioiovo/blog.git"])
         .arg(&dir)
         .output()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| { log::error!("git clone spawn failed: {}", e); e.to_string() })?;
     if !out.status.success() {
-        return Err(String::from_utf8_lossy(&out.stderr).to_string());
+        let e = String::from_utf8_lossy(&out.stderr).to_string();
+        log::error!("git clone failed: {}", e);
+        return Err(e);
     }
     Ok(())
 }
@@ -500,8 +511,39 @@ fn build_router() -> Router {
         .layer(DefaultBodyLimit::max(20 * 1024 * 1024))
 }
 
+use std::io::Write;
+use std::sync::Mutex;
+
+struct FileLogger {
+    file: Mutex<std::fs::File>,
+}
+
+impl log::Log for FileLogger {
+    fn enabled(&self, _metadata: &log::Metadata) -> bool { true }
+    fn log(&self, record: &log::Record) {
+        if let Ok(mut f) = self.file.lock() {
+            let ts = chrono_like_now();
+            let line = format!("{} [{}] {}\n", ts, record.level(), record.args());
+            let _ = f.write_all(line.as_bytes());
+            let _ = f.flush();
+        }
+    }
+    fn flush(&self) {}
+}
+
+fn init_log() {
+    let path = exe_dir().join("blog-admin.log");
+    if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let logger = Box::leak(Box::new(FileLogger { file: Mutex::new(file) }));
+        let _ = log::set_logger(logger);
+        log::set_max_level(log::LevelFilter::Info);
+    }
+}
+
 #[tokio::main]
 async fn main() {
+    init_log();
+    log::info!("=== blog-admin started ===");
     #[cfg(not(debug_assertions))]
     {
         if let Err(e) = ensure_repo() {
@@ -511,7 +553,7 @@ async fn main() {
 
     let app = build_router();
     let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
-    println!("[admin] listening on http://{}", addr);
+    log::info!("admin server listening on http://{}", addr);
 
     // spawn server in background, then start Tauri
     tokio::spawn(async move {
