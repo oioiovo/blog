@@ -1,3 +1,12 @@
+#![windows_subsystem = "windows"]
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+#[cfg(not(windows))]
+const CREATE_NO_WINDOW: u32 = 0;
+
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -210,6 +219,7 @@ fn git(args: &[&str]) -> Result<String, String> {
     let out = Command::new("git")
         .current_dir(repo_dir())
         .args(args)
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| e.to_string())?;
     if !out.status.success() {
@@ -384,15 +394,43 @@ async fn publish() -> axum::response::Response {
     }
 }
 
+fn mime_from_path(p: &Path) -> &'static str {
+    match p.extension().and_then(|e| e.to_str()) {
+        Some("html") => "text/html; charset=utf-8",
+        Some("js") => "application/javascript",
+        Some("css") => "text/css",
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("svg") => "image/svg+xml",
+        Some("json") => "application/json",
+        _ => "application/octet-stream",
+    }
+}
+
 fn chrono_like_now() -> String {
-    // simple local timestamp without chrono dep
-    let out = std::process::Command::new("date")
-        .arg("+%Y/%m/%d %H:%M:%S")
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .unwrap_or_default();
-    out.trim().to_string()
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+    // simple YYYY-MM-DD HH:MM:SS UTC+8
+    let days = secs / 86400;
+    let secs_today = secs % 86400;
+    let (h, m, s) = (secs_today / 3600 + 8, (secs_today % 3600) / 60, secs_today % 60);
+    // approximate date from 1970-01-01
+    let mut y = 1970i64;
+    let mut d = days as i64;
+    loop {
+        let year_days = if (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)) { 366 } else { 365 };
+        if d < year_days { break; }
+        d -= year_days;
+        y += 1;
+    }
+    let month_days = [31, if (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let mut mon = 1;
+    for &md in &month_days {
+        if d < md { break; }
+        d -= md;
+        mon += 1;
+    }
+    format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", y, mon, d + 1, h % 24, m, s)
 }
 
 // ---------- setup / clone ----------
@@ -401,14 +439,18 @@ fn chrono_like_now() -> String {
 fn ensure_repo() -> Result<(), String> {
     let dir = repo_dir();
     if dir.join(".git").exists() {
-        log::info!("pulling latest repo");
-        let _ = git(&["pull"]);
+        log::info!("repo exists, skip pull");
         return Ok(());
     }
     log::info!("cloning repo to {:?}", dir);
     let out = Command::new("git")
+        .env("GIT_SSH_COMMAND", "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null")
         .args(["clone", "git@github.com:oioiovo/blog.git"])
         .arg(&dir)
+        .creation_flags(CREATE_NO_WINDOW)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .stdin(std::process::Stdio::null())
         .output()
         .map_err(|e| { log::error!("git clone spawn failed: {}", e); e.to_string() })?;
     if !out.status.success() {
@@ -494,7 +536,7 @@ fn build_router() -> Router {
 
     Router::new()
         .route("/api/posts", get(list_posts).post(create_post))
-        .route("/api/posts/*path", get(read_post).put(save_post).delete(delete_post))
+        .route("/api/posts/{*path}", get(read_post).put(save_post).delete(delete_post))
         .route("/api/dirs", put(mkdir).post(mkdir).delete(rm_path))
         .route("/api/dirs/rename", post(rename_dir))
         .route("/api/site", get(read_site).put(write_site))
@@ -502,12 +544,11 @@ fn build_router() -> Router {
         .route("/api/about-json", get(read_about_json).put(write_about_json))
         .route("/api/readme", get(read_readme).put(write_readme))
         .route("/api/images", get(list_images).post(upload_image))
-        .route("/api/images/:name", delete(delete_image))
+        .route("/api/images/{name}", delete(delete_image))
         .route("/api/git-status", get(git_status))
         .route("/api/publish", post(publish).put(publish))
         .nest_service("/images", ServeDir::new(&images))
         .nest_service("/blog/images", ServeDir::new(&images))
-        .nest_service("/", ServeDir::new(&admin_static))
         .layer(DefaultBodyLimit::max(20 * 1024 * 1024))
 }
 
@@ -544,38 +585,111 @@ fn init_log() {
 async fn main() {
     init_log();
     log::info!("=== blog-admin started ===");
+
+    // shared setup state
+    static SETUP_DONE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    static SETUP_MSG: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+    // start setup in background if needed
     #[cfg(not(debug_assertions))]
     {
-        if let Err(e) = ensure_repo() {
-            eprintln!("[setup] repo error: {}", e);
+        if !repo_dir().join(".git").exists() {
+            *SETUP_MSG.lock().unwrap() = "正在克隆仓库，请稍候...".to_string();
+            std::thread::spawn(|| {
+                log::info!("background clone started");
+                match ensure_repo() {
+                    Ok(_) => {
+                        *SETUP_MSG.lock().unwrap() = "完成，正在启动...".to_string();
+                        SETUP_DONE.store(true, std::sync::atomic::Ordering::SeqCst);
+                        log::info!("background clone done");
+                    }
+                    Err(e) => {
+                        *SETUP_MSG.lock().unwrap() = format!("克隆失败: {}", e);
+                        log::error!("background clone failed: {}", e);
+                    }
+                }
+            });
+        } else {
+            SETUP_DONE.store(true, std::sync::atomic::Ordering::SeqCst);
         }
     }
+    #[cfg(debug_assertions)]
+    {
+        SETUP_DONE.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
 
+    log::info!("building router");
     let app = build_router();
     let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
-    log::info!("admin server listening on http://{}", addr);
 
-    // spawn server in background, then start Tauri
+    // loading page
+    let loading_html = r#"<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+body{display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:oklch(0.975 0.004 250);font-family:monospace;color:oklch(0.24 0.03 260)}
+.box{text-align:center}
+.spinner{width:40px;height:40px;border:3px solid oklch(0.9 0.01 250);border-top-color:oklch(0.47 0.16 258);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 20px}
+@keyframes spin{to{transform:rotate(360deg)}}
+#msg{font-size:14px}
+</style></head><body><div class="box"><div class="spinner"></div><div id="msg">正在初始化...</div></div>
+<script>
+async function poll(){
+  try{
+    let r=await fetch('/api/setup-status');let d=await r.json();
+    document.getElementById('msg').textContent=d.message;
+    if(d.ready){window.location.href='http://localhost:3001/';return;}
+  }catch(e){}
+  setTimeout(poll,800);
+}
+poll();
+</script></body></html>"#;
+
+    let admin_static = repo_dir().join("admin").join("public");
+    let app = app
+        .route("/api/setup-status", get(|| async {
+            Json(serde_json::json!({
+                "ready": SETUP_DONE.load(std::sync::atomic::Ordering::SeqCst),
+                "message": SETUP_MSG.lock().unwrap().clone()
+            }))
+        }))
+        .fallback(get(move |uri: axum::http::Uri| async move {
+        if SETUP_DONE.load(std::sync::atomic::Ordering::SeqCst) {
+            // serve admin UI
+            let path = uri.path().trim_start_matches('/');
+            let file = if path.is_empty() {
+                admin_static.join("index.html")
+            } else {
+                admin_static.join(path)
+            };
+            match std::fs::read(&file) {
+                Ok(bytes) => {
+                    let mime = mime_from_path(&file);
+                    ([(axum::http::header::CONTENT_TYPE, mime)], bytes).into_response()
+                }
+                Err(_) => axum::response::Html(loading_html.to_string()).into_response(),
+            }
+        } else {
+            axum::response::Html(loading_html.to_string()).into_response()
+        }
+    }));
+
+    log::info!("binding to {}", addr);
+    let app_clone = app;
     tokio::spawn(async move {
-        axum::serve(
-            tokio::net::TcpListener::bind(addr).await.unwrap(),
-            app,
-        )
-        .await
-        .unwrap();
-    });
-
-    // wait a moment for server to start
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-
-    tauri::Builder::default()
-        .setup(|app| {
-            #[cfg(not(debug_assertions))]
-            {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.eval("window.location.href = 'http://localhost:3001';");
+        match tokio::net::TcpListener::bind(addr).await {
+            Ok(listener) => {
+                log::info!("admin server listening on http://{}", addr);
+                if let Err(e) = axum::serve(listener, app_clone).await {
+                    log::error!("server error: {}", e);
                 }
             }
+            Err(e) => log::error!("bind failed: {}", e),
+        }
+    });
+
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    log::info!("starting tauri window");
+
+    tauri::Builder::default()
+        .setup(|_app| {
             Ok(())
         })
         .run(tauri::generate_context!())

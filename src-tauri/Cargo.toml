@@ -4,6 +4,13 @@ version = "0.1.0"
 description = "博客管理后台"
 edition = "2021"
 
+[[bin]]
+name = "blog-admin"
+path = "src/main.rs"
+
+[profile.release]
+panic = "abort"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
